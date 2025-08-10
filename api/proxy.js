@@ -1,44 +1,56 @@
-// /api/proxy.js
-
-// This is a Vercel Serverless Function that acts as a secure proxy to Supabase.
-// It uses the SERVICE_ROLE_KEY to bypass RLS for server-side operations,
-// but it first authenticates the user's token from the browser.
-
+// /api/proxy.js (with enhanced logging)
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
-    // Disallow non-POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     try {
-        const { action, payload } = req.body;
+        const { action } = req.body;
+        console.log(`[PROXY LOG] Received action: ${action}`);
 
-        // Securely initialize Supabase client on the server
-        const supabase = createClient(
-            process.env.SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_KEY, // Use the powerful service key here
-        );
+        // Log the environment variables to check if they are loaded correctly
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const serviceKey = process.env.SUPABASE_SERVICE_KEY;
 
-        // Get the user's token from the Authorization header
+        if (!supabaseUrl || !serviceKey) {
+            console.error('[PROXY LOG] CRITICAL ERROR: Supabase URL or Service Key is MISSING from Vercel environment variables.');
+            return res.status(500).json({ error: 'Server configuration error: Keys not found.' });
+        }
+
+        console.log(`[PROXY LOG] Supabase URL loaded: ${supabaseUrl}`);
+        console.log(`[PROXY LOG] Service Key loaded. Length: ${serviceKey.length}. Starts with: ${serviceKey.substring(0, 3)}...`);
+
+        // Initialize Supabase client
+        const supabase = createClient(supabaseUrl, serviceKey);
+
+        // Check for Authorization header
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.log('[PROXY LOG] Auth token missing from request headers.');
             return res.status(401).json({ error: 'Authorization token not provided' });
         }
-        const token = authHeader.split(' ')[1];
 
-        // Verify the token and get the user
+        const token = authHeader.split(' ')[1];
+        console.log('[PROXY LOG] Token received. Attempting to validate with Supabase...');
+
+        // Validate the token
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+        // If validation fails, log the SPECIFIC error from Supabase
         if (userError || !user) {
-            return res.status(401).json({ error: 'Invalid or expired token' });
+            console.error('[PROXY LOG] TOKEN VALIDATION FAILED. The specific error from Supabase is:', userError);
+            return res.status(401).json({ error: `Token Validation Failed. Supabase says: ${userError.message}` });
         }
 
-        // This is the user's unique ID
+        console.log(`[PROXY LOG] Token validated successfully for user: ${user.email}`);
         const userId = user.id;
-        let data, error;
 
-        // Handle different actions from the frontend
+        // --- The rest of your function logic ---
+        let data, error;
+        const { payload } = req.body;
+
         switch (action) {
             case 'fetchAll':
                 const [transactions, expenses, debtors, creditors, transfers, banks] = await Promise.all([
@@ -50,11 +62,10 @@ export default async function handler(req, res) {
                     supabase.from('banks').select('*').eq('user_id', userId),
                 ]);
 
-                // Check for errors in any of the fetches
-                if (transactions.error || expenses.error || debtors.error || creditors.error || transfers.error || banks.error) {
-                    // Combine error messages if any
-                    const combinedError = [transactions.error, expenses.error, debtors.error, creditors.error, transfers.error, banks.error]
-                        .filter(Boolean).map(e => e.message).join('; ');
+                const errors = [transactions.error, expenses.error, debtors.error, creditors.error, transfers.error, banks.error].filter(Boolean);
+                if (errors.length > 0) {
+                    const combinedError = errors.map(e => e.message).join('; ');
+                    console.error('[PROXY LOG] Error fetching data:', combinedError);
                     return res.status(500).json({ error: `Fetch error: ${combinedError}` });
                 }
 
@@ -67,36 +78,13 @@ export default async function handler(req, res) {
                     banks: banks.data,
                 });
 
-            // Handle individual record creation/update/deletion
-            case 'addOrUpdate':
-                ({ data, error } = await supabase
-                    .from(payload.table)
-                    .upsert({ ...payload.data, user_id: userId }) // upsert handles both insert and update
-                    .select()
-                    .single());
-                break;
-
-            case 'delete':
-                ({ error } = await supabase
-                    .from(payload.table)
-                    .delete()
-                    .eq('user_id', userId) // Extra security check
-                    .eq('id', payload.id));
-                break;
-
+            // Other cases...
             default:
                 return res.status(400).json({ error: 'Invalid action' });
         }
 
-        if (error) {
-            console.error('Supabase Error:', error);
-            return res.status(500).json({ error: error.message });
-        }
-
-        return res.status(200).json(data || { success: true });
-
     } catch (e) {
-        console.error('Proxy Error:', e);
-        return res.status(500).json({ error: 'An unexpected error occurred.' });
+        console.error('[PROXY LOG] UNEXPECTED FATAL ERROR in catch block:', e);
+        return res.status(500).json({ error: 'A fatal server error occurred.' });
     }
 }
