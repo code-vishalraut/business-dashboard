@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital World Business Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <div id="auth-container" class="login-overlay" style="display: flex;">
+        <div class="login-box">
+            <h2>Digital World Dashboard</h2>
+            <p>Please log in to continue</p>
+            <form id="login-form">
+                <input type="email" id="login-email" placeholder="Email" required
+                    style="width: 100%; margin-bottom: 10px; padding: 10px;">
+                <input type="password" id="login-password" placeholder="Password" required
+                    style="width: 100%; margin-bottom: 10px; padding: 10px;">
+                <button type="submit" style="width: 100%; padding: 10px;">Login</button>
+                <p id="auth-error" style="color: red; margin-top: 10px;"></p>
+            </form>
+        </div>
+    </div>
+
+    <div class="page-wrapper" id="dashboard-wrapper" style="display: none;">
+        <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span id="welcome-message" style="font-weight: bold;"></span>
+            <button id="logoutBtn"
+                style="padding: 8px 12px; background-color: #DC3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Logout</button>
+        </div>
+
+        <header>
+            <img src="pf.JPG" alt="Business Logo" class="logo">
+            <h1>Digital World</h1>
+        </header>
+
+        <div class="dashboard-stats-container">
+            <div class="dashboard-stats">
+                <div class="stat-card income-pill">
+                    <h3>Total Income</h3>
+                    <p>₹<span id="totalIncome">0</span></p>
+                </div>
+                <div class="stat-card expense-pill">
+                    <h3>Total Expenses</h3>
+                    <p>₹<span id="totalExpenses">0</span></p>
+                </div>
+                <div class="stat-card profit-pill">
+                    <h3>Net Profit</h3>
+                    <p>₹<span id="netProfit">0</span></p>
+                </div>
+                <div class="stat-card balance-pill">
+                    <h3>Cash Balance</h3>
+                    <p>₹<span id="cashBalance">0</span></p>
+                </div>
+                <div class="stat-card balance-pill">
+                    <h3>Bank Balance</h3>
+                    <p>₹<span id="bankBalance">0</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <button id="quickAddTransBtn"><i class="fas fa-exchange-alt"></i> Add Transaction</button>
+            <button id="quickAddExpenseBtn"><i class="fas fa-receipt"></i> Add Expense</button>
+            <button id="quickAddDebtorBtn"><i class="fas fa-user-tag"></i> Add Debtor</button>
+            <button id="quickAddCreditorBtn"><i class="fas fa-user-check"></i> Add Creditor</button>
+            <button id="quickAddTransferBtn"><i class="fas fa-exchange-alt"></i> Add Transfer</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" id="tabHome"><i class="fas fa-home"></i> Home</button>
+            <button class="tab" id="tabMain"><i class="fas fa-exchange-alt"></i> Transactions</button>
+            <button class="tab" id="tabExpenses"><i class="fas fa-receipt"></i> Expenses</button>
+            <button class="tab" id="tabDebtors"><i class="fas fa-user-tag"></i> Debtors</button>
+            <button class="tab" id="tabCreditors"><i class="fas fa-user-check"></i> Creditors</button>
+            <button class="tab" id="tabAccount"><i class="fas fa-university"></i> Account</button>
+            <button class="tab" id="tabCash"><i class="fas fa-wallet"></i> Cash</button>
+            <button class="tab" id="tabTransfers"><i class="fas fa-exchange-alt"></i> Transfers</button>
+            <button class="tab" id="tabExport"><i class="fas fa-file-export"></i> Export</button>
+        </div>
+
+        <div class="tab-content active" id="tabHomeContent">
+            <div class="chart-controls" style="margin-bottom: 1.5rem;">
+                <select id="chartPeriod">
+                    <option value="7">Last 7 Days</option>
+                    <option value="15">Last 15 Days</option>
+                    <option value="30">Last 30 Days</option>
+                </select>
+                <select id="chartDataType">
+                    <option value="income">Income</option>
+                    <option value="expense">Expense</option>
+                    <option value="profit">Profit</option>
+                    <option value="cash">Cash Flow</option>
+                    <option value="bank">Bank Flow</option>
+                </select>
+            </div>
+            <div id="miniTrendChartContainer" style="margin: 24px 0;">
+                <canvas id="miniTrendChart" height="60"></canvas>
+            </div>
+
+            <div id="bankPieChartContainer"
+                style="margin: 32px auto; max-width: 480px; background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 1rem;">
+                <h3 style="text-align:center; margin-bottom: 1rem;">Bank-wise Balance %</h3>
+                <canvas id="bankPieChart" height="180"></canvas>
+            </div>
+
+            <div id="trendChartContainer" style="margin: 24px 0;">
+                <canvas id="trendChart" height="60"></canvas>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tabMainContent">
+            <button class="add-form-btn" id="addTransactionBtn"><i class="fas fa-plus"></i> Add Transaction</button>
+            <table class="desktop-view" id="transactionsTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Description</th>
+                        <th>In (₹)</th>
+                        <th>In Type(s)</th>
+                        <th>Out (₹)</th>
+                        <th>Out Type(s)</th>
+                        <th>Profit</th>
+                        <th>Status</th>
+                        <th>Receipt</th>
+                        <th>Edit</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="tab-content" id="tabExpensesContent">
+            <button class="add-form-btn" id="addExpenseBtn"><i class="fas fa-plus"></i> Add Expense</button>
+            <div class="filter-bar">
+                <label><i class="fas fa-filter"></i> Category:</label>
+                <select id="filterCategory">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <table class="desktop-view" id="expensesTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Item</th>
+                        <th>Amount (₹)</th>
+                        <th>Payment</th>
+                        <th>Receipt</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="expensesBody"></tbody>
+            </table>
+        </div>
+
+        <div class="tab-content" id="tabDebtorsContent">
+            <button class="add-form-btn" id="addDebtorBtn"><i class="fas fa-plus"></i> Add Debtor</button>
+            <table class="desktop-view" id="debtorsTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Amount (₹)</th>
+                        <th>Payment Type</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="debtorsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="tab-content" id="tabCreditorsContent">
+            <button class="add-form-btn" id="addCreditorBtn"><i class="fas fa-plus"></i> Add Creditor</button>
+            <table class="desktop-view" id="creditorsTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Amount (₹)</th>
+                        <th>Payment Type</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="creditorsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="tab-content" id="tabAccountContent">
+            <div class="account-header">
+                <h2><i class="fas fa-university"></i> Bank Accounts</h2>
+                <button id="manageBanksBtn" class="manage-banks-btn"><i class="fas fa-plus-square"></i> Manage
+                    Banks</button>
+            </div>
+            <div id="bankBalances" class="bank-balances-list"></div>
+            <div id="bankStatementSelector">
+                <h3>Selected Bank: <span id="selectedBankName">None</span></h3>
+                <div id="bankStatementTableContainer"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tabCashContent">
+            <p class="balance-line">Running Cash Balance: ₹<span id="cashBalanceCash">0.00</span></p>
+            <table class="desktop-view" id="cashStatementTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>In (₹)</th>
+                        <th>Out (₹)</th>
+                        <th>Balance (₹)</th>
+                    </tr>
+                </thead>
+                <tbody id="cashStatementBody"></tbody>
+            </table>
+        </div>
+
+        <div class="tab-content" id="tabTransfersContent">
+            <button class="add-form-btn" id="addTransferBtn"><i class="fas fa-plus"></i> Add Transfer</button>
+            <table class="desktop-view" id="transfersTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Amount (₹)</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="transfersBody"></tbody>
+            </table>
+        </div>
+
+        <div class="tab-content" id="tabExportContent">
+            <button class="export-btn" id="exportMainBtn"><i class="fas fa-file-csv"></i> Export Transactions</button>
+            <button class="export-btn" id="exportExpensesBtn"><i class="fas fa-file-csv"></i> Export Expenses</button>
+            <button class="export-btn" id="exportDebtorsBtn"><i class="fas fa-file-csv"></i> Export Debtors</button>
+            <button class="export-btn" id="exportCreditorsBtn"><i class="fas fa-file-csv"></i> Export Creditors</button>
+            <button class="export-btn" id="exportCashBtn"><i class="fas fa-file-csv"></i> Export Cash Statement</button>
+            <button class="export-btn" id="exportTransfersBtn"><i class="fas fa-file-csv"></i> Export Transfers</button>
+            <p style="margin-top:20px;color:#666;text-align:center;">Click to download .csv files for Excel.</p>
+        </div>
+
+        <div class="modal" id="settleModal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2 id="settleModalTitle">Settle Debt</h2>
+                <form id="settleForm">
+                    <input type="hidden" id="settleType">
+                    <input type="hidden" id="settleId">
+                    <p>Settling with: <b id="settleName"></b></p>
+                    <p>Original Amount: <b id="settleOriginalAmount"></b></p>
+                    <label>Amount being Settled (₹)</label>
+                    <input type="number" id="settleAmount" min="0" step="0.01" required>
+                    <label>Payment Type</label>
+                    <select id="settlePaymentType" required></select>
+                    <button type="submit">💾 Confirm Settlement</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal" id="receiptModal">
+            <div class="receipt-container-v2">
+                <div class="receipt-body-v2">
+                </div>
+                <div class="receipt-actions">
+                    <button id="printReceiptBtn"><i class="fas fa-print"></i> Print</button>
+                    <button id="closeReceiptBtn"><i class="fas fa-times"></i> Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="banksModal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2>Manage Bank Accounts</h2>
+                <div id="banksList"></div>
+                <input type="text" id="newBankName" placeholder="Add new bank, e.g. HDFC, SBI">
+                <button id="addBankBtn">Add Bank</button>
+            </div>
+        </div>
+
+        <div class="modal" id="transactionFormModal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2 id="transactionModalTitle">New Transaction</h2>
+                <form id="transactionForm">
+                    <input type="hidden" id="editingTransactionId">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="datetime-local" id="transDate" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Name</label>
+                            <input type="text" id="transName" required>
+                        </div>
+                        <div class="form-group half">
+                            <label>Phone</label>
+                            <input type="text" id="transPhone">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="transDesc" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount In (₹)</label>
+                        <div id="transInContainer" class="split-payment-container"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount Out (₹)</label>
+                        <div id="transOutContainer" class="split-payment-container"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Status</label>
+                            <select id="transStatus">
+                                <option value="Pending">Pending</option>
+                                <option value="Done">Done</option>
+                            </select>
+                        </div>
+                        <div class="form-group half">
+                            <label>Notes</label>
+                            <textarea id="transNotes" rows="2" placeholder="Optional"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">💾 Save Transaction</button>
+                        <button type="button" id="deleteTransactionBtn" class="delete-btn" style="display: none;">🗑️
+                            Delete Transaction</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+    <footer>
+        <p>&copy; 2025 Digital World. All rights reserved.</p>
+    </footer>
+
+    <script src="dashboard.js"></script>
+</body>
+
+</html>
