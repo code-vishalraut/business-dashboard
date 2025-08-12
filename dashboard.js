@@ -1,130 +1,59 @@
 // =================================================================
-// SUPABASE & AUTHENTICATION SETUP
+// NEW: SUPABASE & AUTHENTICATION SETUP
 // =================================================================
-const SUPABASE_URL = 'https://clcqdjmfkkvqzxcjbvdm.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsY3Fkam1ma2t2cXp4Y2pidmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MTY4MDEsImV4cCI6MjA3MDM5MjgwMX0.C57KA-Ck1YPckr49pH3hfH4fJ5bNzklkINaeseGOFAE';
+const SUPABASE_URL = 'https://clcqdjafkkvqzxcjbvdm.supabase.co';
+// !!! IMPORTANT: PASTE YOUR 'anon public' KEY FROM YOUR SUPABASE PROJECT HERE !!!
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_FROM_SUPABASE';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// DOM Elements for Auth
-const authContainer = document.getElementById('auth-container');
-const dashboardWrapper = document.getElementById('dashboard-wrapper');
-const loginForm = document.getElementById('login-form');
-const logoutBtn = document.getElementById('logoutBtn');
-const welcomeMessage = document.getElementById('welcome-message');
-const authError = document.getElementById('auth-error');
-
-
-// =================================================================
-// DATA STORAGE (IN-MEMORY, POPULATED FROM SUPABASE)
-// =================================================================
-let transactions = [];
-let expenses = [];
-let debtors = [];
-let creditors = [];
-let transfers = [];
-let banks = []; // Now stores bank objects {id, name, user_id}
+// --- In-Memory Data Storage (loaded from Supabase) ---
+let transactions = [], expenses = [], debtors = [], creditors = [], transfers = [];
+let banks = []; // This will now be an array of bank name strings
 let categories = [];
 let cashStatements = [];
 let bankStatements = {};
 let balances = { cash: 0, bank: 0 };
 let realtimeChannel;
 
+// --- DOM Elements ---
+const authContainer = document.getElementById('auth-container');
+const dashboardWrapper = document.getElementById('dashboard-wrapper');
+const loginForm = document.getElementById('login-form');
+const logoutBtn = document.getElementById('logoutBtn');
+// All other DOM element selectors from your original file are kept below in their original context
 
 // =================================================================
-// API HELPER FUNCTION
+// NEW: AUTH & DATA LOADING LOGIC
 // =================================================================
-async function apiCall(action, payload) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        console.error("No active session. Cannot make API call.");
-        handleLogout(); // Log out if session is lost
-        return;
-    }
 
-    try {
-        const response = await fetch('/api/proxy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({ action, payload })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `API Error: ${response.statusText}`);
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error(`API call failed for action "${action}":`, error);
-        alert(`An error occurred: ${error.message}`);
-        // Optional: Implement more robust error handling, e.g., a toast notification
-        throw error; // Re-throw to allow calling function to handle it
-    }
-}
-
-
-// =================================================================
-// AUTHENTICATION LOGIC
-// =================================================================
+// --- Login/Logout & Session Handling ---
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    authError.textContent = '';
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-        authError.textContent = error.message;
-    } else if (data.user) {
-        await initializeDashboard(data.user);
-    }
+    document.getElementById('auth-error').textContent = '';
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-password').value
+    });
+    if (error) document.getElementById('auth-error').textContent = error.message;
 });
 
-logoutBtn.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-});
+logoutBtn.addEventListener('click', () => supabase.auth.signOut());
 
-// Listen for auth state changes (login, logout)
 supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || !session) {
-        handleLogout();
+        dashboardWrapper.style.display = 'none';
+        authContainer.style.display = 'flex';
+        if (realtimeChannel) supabase.removeChannel(realtimeChannel);
     } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if(session.user) initializeDashboard(session.user);
+        if (session.user) initializeDashboard(session.user);
     }
 });
 
-function handleLogout() {
-    // Hide dashboard, show login
-    dashboardWrapper.style.display = 'none';
-    authContainer.style.display = 'flex';
-    welcomeMessage.textContent = '';
-    
-    // Unsubscribe from real-time channel
-    if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
-        realtimeChannel = null;
-    }
-
-    // Clear all in-memory data
-    transactions = [];
-    expenses = [];
-    debtors = [];
-    creditors = [];
-    transfers = [];
-    banks = [];
-}
-
 async function initializeDashboard(user) {
-    welcomeMessage.textContent = `Welcome, ${user.email}`;
+    document.getElementById('welcome-message').textContent = `Welcome, ${user.email}`;
     authContainer.style.display = 'none';
     dashboardWrapper.style.display = 'block';
-
-    // Fetch all initial data from the backend
     try {
         const allData = await apiCall('fetchAll');
         transactions = allData.transactions || [];
@@ -132,147 +61,58 @@ async function initializeDashboard(user) {
         debtors = allData.debtors || [];
         creditors = allData.creditors || [];
         transfers = allData.transfers || [];
-        banks = allData.banks || [];
-        
-        // Initial setup and render
-        init();
-        
-        // Setup real-time listeners AFTER initial data is loaded
+        banks = ['Bank (Generic)'].concat((allData.banks || []).map(b => b.name));
+
+        init(); // Call your original init function
         setupRealtimeListeners();
     } catch (error) {
         console.error("Failed to initialize dashboard:", error);
-        alert("Could not load your data. Please try refreshing the page.");
+        alert("Could not load your data. Please check the Vercel logs for a specific error message.");
     }
 }
 
-// =================================================================
-// REAL-TIME DATA HANDLING
-// =================================================================
+// --- API Helper ---
+async function apiCall(action, payload) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("No active session.");
+    const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action, payload })
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API Error: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+// --- Real-time Setup ---
 function setupRealtimeListeners() {
-    if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel); // Remove old channel if exists
-    }
-    
-    realtimeChannel = supabase.channel('dashboard_updates')
-        .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-            console.log('Real-time change received:', payload);
-            const { table, eventType, new: newRecord, old: oldRecord } = payload;
-            let recordId = (eventType === 'DELETE' ? oldRecord.id : newRecord.id);
-
-            // Generic function to update local arrays
-            const updateLocalArray = (arr) => {
-                const index = arr.findIndex(item => item.id === recordId);
-                if (eventType === 'INSERT') {
-                    arr.unshift(newRecord);
-                } else if (eventType === 'UPDATE') {
-                    if (index > -1) arr[index] = newRecord;
-                } else if (eventType === 'DELETE') {
-                    if (index > -1) arr.splice(index, 1);
-                }
-            };
-            
-            // Update the correct local data array based on the table name
-            switch (table) {
-                case 'transactions': updateLocalArray(transactions); renderTransactions(); break;
-                case 'expenses': updateLocalArray(expenses); renderExpenses(); renderCategoryFilter(); break;
-                case 'debtors': updateLocalArray(debtors); renderDebtors(); break;
-                case 'creditors': updateLocalArray(creditors); renderCreditors(); break;
-                case 'transfers': updateLocalArray(transfers); renderTransfers(); break;
-                case 'banks': 
-                    updateLocalArray(banks);
-                    updatePaymentTypeOptions(); // Update dropdowns everywhere
-                    renderBanksList(); // Update modal list
-                    break;
-            }
-            
-            // Recalculate everything after any change
-            makeStatements();
-        })
-        .subscribe();
+    // This function can be expanded later to handle live data updates without refreshing.
 }
 
 
-// --- Rest of your dashboard.js code ---
-// IMPORTANT: All functions that used to save to localStorage now need to call apiCall()
-// Example: Saving an expense
-// Old: expenses.unshift(ex); localStorage.setItem(...)
-// New: await apiCall('addOrUpdate', { table: 'expenses', data: ex });
-
-// Paste your entire dashboard.js content below, then we will modify key functions.
-// I have done the modifications for you below. Use this complete script.
-
 // =================================================================
-// GLOBALS
+// YOUR ORIGINAL CODE - MODIFIED TO WORK WITH SUPABASE
 // =================================================================
+
+// NOTE: The PIN login function is removed as it's replaced by Supabase login.
+// NOTE: All 'localStorage.setItem' and 'localStorage.getItem' calls are removed.
 
 // DOM elements
-const tabs = {
-    home: document.getElementById('tabHome'),
-    main: document.getElementById('tabMain'),
-    expenses: document.getElementById('tabExpenses'),
-    debtors: document.getElementById('tabDebtors'),
-    creditors: document.getElementById('tabCreditors'),
-    account: document.getElementById('tabAccount'),
-    cash: document.getElementById('tabCash'),
-    transfers: document.getElementById('tabTransfers'),
-    export: document.getElementById('tabExport')
-};
-const tabContents = {
-    home: document.getElementById('tabHomeContent'),
-    main: document.getElementById('tabMainContent'),
-    expenses: document.getElementById('tabExpensesContent'),
-    debtors: document.getElementById('tabDebtorsContent'),
-    creditors: document.getElementById('tabCreditorsContent'),
-    account: document.getElementById('tabAccountContent'),
-    cash: document.getElementById('tabCashContent'),
-    transfers: document.getElementById('tabTransfersContent'),
-    export: document.getElementById('tabExportContent')
-};
-const stats = {
-    income: document.getElementById('totalIncome'),
-    expenses: document.getElementById('totalExpenses'),
-    profit: document.getElementById('netProfit'),
-    cash: document.getElementById('cashBalance'),
-    bank: document.getElementById('bankBalance')
-};
-const tables = {
-    transactionsBody: document.getElementById('transactionsBody'),
-    expensesBody: document.getElementById('expensesBody'),
-    debtorsBody: document.getElementById('debtorsBody'),
-    creditorsBody: document.getElementById('creditorsBody'),
-    cashStatementBody: document.getElementById('cashStatementBody'),
-    transfersBody: document.getElementById('transfersBody')
-};
-const filters = {
-    category: document.getElementById('filterCategory'),
-    categoryList: document.getElementById('categoryList')
-};
-const modals = {
-    transaction: document.getElementById('transactionFormModal'),
-    expense: document.getElementById('expenseFormModal'),
-    debtor: document.getElementById('debtorFormModal'),
-    creditor: document.getElementById('creditorFormModal'),
-    transfer: document.getElementById('transferFormModal'),
-    receipt: document.getElementById('receiptModal'),
-    banks: document.getElementById('banksModal'),
-    settle: document.getElementById('settleModal')
-};
-const forms = {
-    transaction: document.getElementById('transactionForm'),
-    expense: document.getElementById('expenseForm'),
-    debtor: document.getElementById('debtorForm'),
-    creditor: document.getElementById('creditorForm'),
-    transfer: document.getElementById('transferForm'),
-    settle: document.getElementById('settleForm')
-};
+const tabs = { home: document.getElementById('tabHome'), main: document.getElementById('tabMain'), expenses: document.getElementById('tabExpenses'), debtors: document.getElementById('tabDebtors'), creditors: document.getElementById('tabCreditors'), account: document.getElementById('tabAccount'), cash: document.getElementById('tabCash'), transfers: document.getElementById('tabTransfers'), export: document.getElementById('tabExport') };
+const tabContents = { home: document.getElementById('tabHomeContent'), main: document.getElementById('tabMainContent'), expenses: document.getElementById('tabExpensesContent'), debtors: document.getElementById('tabDebtorsContent'), creditors: document.getElementById('tabCreditorsContent'), account: document.getElementById('tabAccountContent'), cash: document.getElementById('tabCashContent'), transfers: document.getElementById('tabTransfersContent'), export: document.getElementById('tabExportContent') };
+const stats = { income: document.getElementById('totalIncome'), expenses: document.getElementById('totalExpenses'), profit: document.getElementById('netProfit'), cash: document.getElementById('cashBalance'), bank: document.getElementById('bankBalance') };
+const tables = { transactionsBody: document.getElementById('transactionsBody'), expensesBody: document.getElementById('expensesBody'), debtorsBody: document.getElementById('debtorsBody'), creditorsBody: document.getElementById('creditorsBody'), cashStatementBody: document.getElementById('cashStatementBody'), transfersBody: document.getElementById('transfersBody') };
+const filters = { category: document.getElementById('filterCategory'), categoryList: document.getElementById('categoryList') };
+const modals = { transaction: document.getElementById('transactionFormModal'), expense: document.getElementById('expenseFormModal'), debtor: document.getElementById('debtorFormModal'), creditor: document.getElementById('creditorFormModal'), transfer: document.getElementById('transferFormModal'), receipt: document.getElementById('receiptModal'), banks: document.getElementById('banksModal'), settle: document.getElementById('settleModal') };
+const buttons = { addExpense: document.getElementById('addExpenseBtn'), addDebtor: document.getElementById('addDebtorBtn'), addCreditor: document.getElementById('addCreditorBtn'), addTransfer: document.getElementById('addTransferBtn'), quickAddTrans: document.getElementById('quickAddTransBtn'), quickAddExpense: document.getElementById('quickAddExpenseBtn'), quickAddDebtor: document.getElementById('quickAddDebtorBtn'), quickAddCreditor: document.getElementById('quickAddCreditorBtn'), quickAddTransfer: document.getElementById('quickAddTransferBtn'), reset: document.getElementById('resetAllBtn'), printReceipt: document.getElementById('printReceiptBtn'), closeReceipt: document.getElementById('closeReceiptBtn'), manageBanks: document.getElementById('manageBanksBtn'), addBank: document.getElementById('addBankBtn'), deleteTransaction: document.getElementById('deleteTransactionBtn') };
+const forms = { transaction: document.getElementById('transactionForm'), expense: document.getElementById('expenseForm'), debtor: document.getElementById('debtorForm'), creditor: document.getElementById('creditorForm'), transfer: document.getElementById('transferForm'), settle: document.getElementById('settleForm') };
+const exportBtns = { transactions: document.getElementById('exportMainBtn'), expenses: document.getElementById('exportExpensesBtn'), debtors: document.getElementById('exportDebtorsBtn'), creditors: document.getElementById('exportCreditorsBtn'), account: document.getElementById('exportAccountBtn'), cash: document.getElementById('exportCashBtn'), transfers: document.getElementById('exportTransfersBtn') };
+let bankStatementFilter = { from: null, to: null };
 
-// ... (keep all your other global variables like buttons, etc.)
-
-// =================================================================
-// FUNCTIONS
-// =================================================================
-
-// --- Tab Navigation (no changes needed) ---
+// --- Tab Navigation ---
 function openTab(tabName) {
     Object.values(tabContents).forEach(content => content.classList.remove('active'));
     Object.values(tabs).forEach(tab => tab.classList.remove('active'));
@@ -283,118 +123,96 @@ Object.entries(tabs).forEach(([name, tab]) => {
     tab.addEventListener('click', () => openTab(name));
 });
 
-// --- Modals (no changes needed) ---
+// --- Modals ---
 function showModal(modalName) {
-    if (modals[modalName]) modals[modalName].classList.add('active');
+    if (modals[modalName]) modals[modalName].style.display = 'flex';
 }
 document.querySelectorAll('.modal .close-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => e.target.closest('.modal').classList.remove('active'));
+    btn.addEventListener('click', (e) => {
+        const modal = e.target.closest('.modal');
+        if (modal) {
+            modal.style.display = 'none';
+            if (modal.id === 'transactionFormModal') resetTransactionForm();
+        }
+    });
 });
 
-// --- MODIFIED: Update Payment/Bank Type Options ---
+// --- Update Payment/Bank Type Options ---
 function updatePaymentTypeOptions() {
-    const bankOpts = banks.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+    const bankOpts = banks.filter(b => b !== 'Cash' && b !== 'Bank (Generic)').map(b => `<option value="${b}">${b}</option>`).join('');
     const allOpts = `<option value="Cash">Cash</option>${bankOpts}`;
-    document.querySelectorAll('.transInType, .transOutType, #expensePaymentType, #debtorPaymentType, #creditorPaymentType, #transferFrom, #transferTo, #settlePaymentType')
-        .forEach(select => { select.innerHTML = allOpts; });
+    document.querySelectorAll('.transInType, .transOutType, #expensePaymentType, #debtorPaymentType, #creditorPaymentType, #transferFrom, #transferTo, #settlePaymentType').forEach(select => select.innerHTML = allOpts);
 }
 
-// --- Split Payment (no changes needed) ---
-// ... (your setupSplitPaymentButtons and setupRemoveSplitButtons functions)
+// --- Split Payment Row ---
+function setupSplitPaymentButtons() { /* Your original function here */ }
+function setupRemoveSplitButtons() { /* Your original function here */ }
 
-// --- MODIFIED: Banks Management ---
-function renderBanksList() {
-    document.getElementById('banksList').innerHTML = banks.map(b => 
-        `<div>${b.name} <button class="remove-bank-btn" data-id="${b.id}" style="float: right; color: red; background: none; border: none; cursor: pointer;">&times;</button></div>`
-    ).join('');
-
-    // Add event listeners for the new delete buttons
-    document.querySelectorAll('.remove-bank-btn').forEach(btn => {
-        btn.addEventListener('click', async function() {
-            const bankId = this.dataset.id;
-            if (confirm('Are you sure you want to delete this bank? This cannot be undone.')) {
-                try {
-                    await apiCall('delete', { table: 'banks', id: bankId });
-                    // The real-time listener will handle the UI update.
-                } catch (error) {
-                    alert('Failed to delete bank.');
-                }
-            }
-        });
-    });
+// --- Banks Management ---
+async function renderBanksList() {
+    const bankListElem = document.getElementById('banksList');
+    if (!bankListElem) return;
+    const currentBanks = (await apiCall('fetchAll')).banks.map(b => b.name);
+    bankListElem.innerHTML = currentBanks.filter(b => b !== 'Cash').map(b => `<div>${b}</div>`).join('');
 }
-document.getElementById('manageBanksBtn').addEventListener('click', () => {
+
+buttons.manageBanks.addEventListener('click', () => {
     renderBanksList();
     showModal('banks');
 });
-document.getElementById('addBankBtn').addEventListener('click', async () => {
+buttons.addBank.addEventListener('click', async () => {
     const bankName = document.getElementById('newBankName').value.trim();
     if (!bankName) return;
-    if (!banks.some(b => b.name === bankName)) {
-        const newBank = { name: bankName };
-        try {
-            await apiCall('addOrUpdate', { table: 'banks', data: newBank });
-            document.getElementById('newBankName').value = '';
-            // Real-time listener handles the rest.
-        } catch (error) {
-            alert('Failed to add bank.');
-        }
+    if (!banks.includes(bankName)) {
+        await apiCall('addOrUpdate', { table: 'banks', data: { name: bankName } });
+        banks.push(bankName);
+        updatePaymentTypeOptions();
+        renderBanksList();
+        document.getElementById('newBankName').value = '';
+        alert(`Added bank: ${bankName}`);
+        makeStatements();
     } else {
         alert(`${bankName} already exists!`);
     }
 });
 
 
-// --- Table Rendering (MODIFIED to use 'id' instead of index) ---
+// ... PASTE ALL YOUR ORIGINAL FUNCTIONS HERE ...
+// (`renderCategoryFilter`, `renderTransactions`, `renderExpenses`, `renderDebtors`, etc.)
+// Make the necessary modifications as shown in the examples below:
+
+
+// EXAMPLE MODIFICATION for renderTransactions
 function renderTransactions() {
     tables.transactionsBody.innerHTML = transactions
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .map(tx => {
             let inTotal = tx.in_payments?.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) || 0;
+            let inTypes = tx.in_payments?.map(p => p.type).join(', ') || 'N/A';
             let outTotal = tx.out_payments?.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) || 0;
+            let outTypes = tx.out_payments?.map(p => p.type).join(', ') || 'N/A';
             let profit = inTotal - outTotal;
             return `
-        <tr>
-          <td>${new Date(tx.date).toLocaleString()}</td>
-          <td>${tx.name}</td>
-          <td>${tx.phone || ''}</td>
-          <td>${tx.description}</td>
-          <td>₹${inTotal.toFixed(2)}</td>
-          <td>${tx.in_payments?.map(p => p.type).join(', ') || 'N/A'}</td>
-          <td>₹${outTotal.toFixed(2)}</td>
-          <td>${tx.out_payments?.map(p => p.type).join(', ') || 'N/A'}</td>
-          <td>₹${profit.toFixed(2)}</td>
-          <td class="status-${tx.status?.toLowerCase() || 'pending'}">${tx.status || 'Pending'}</td>
-          <td><button class="receipt-btn" data-id="${tx.id}"><i class="fas fa-receipt"></i></button></td>
-          <td><button class="edit-btn" data-id="${tx.id}"><i class="fas fa-pencil-alt"></i></button></td>
-          <td>${tx.notes || '-'}</td>
-        </tr>`;
-        })
-        .join('') || '<tr><td colspan="13">No transactions yet</td></tr>';
-    // Add event listeners using delegation for better performance
+                <tr>
+                    <td>${new Date(tx.date).toLocaleString()}</td>
+                    <td>${tx.name}</td>
+                    <td>${tx.phone || ''}</td>
+                    <td>${tx.description}</td>
+                    <td>₹${inTotal.toFixed(2)}</td>
+                    <td>${inTypes}</td>
+                    <td>₹${outTotal.toFixed(2)}</td>
+                    <td>${outTypes}</td>
+                    <td>₹${profit.toFixed(2)}</td>
+                    <td class="status-${tx.status?.toLowerCase() || 'pending'}">${tx.status || 'Pending'}</td>
+                    <td><button class="receipt-btn" data-id="${tx.id}"><i class="fas fa-receipt"></i></button></td>
+                    <td><button class="edit-btn" data-id="${tx.id}"><i class="fas fa-pencil-alt"></i></button></td>
+                    <td>${tx.notes || '-'}</td>
+                </tr>`;
+        }).join('');
+    // You'll need to re-attach event listeners here or use event delegation
 }
 
-// ... continue modifying renderExpenses, renderDebtors, renderCreditors to use `data-id`
-
-// --- Event Listener Delegation (Add this to your init function) ---
-function setupEventListeners() {
-    document.body.addEventListener('click', e => {
-        const target = e.target;
-        // Edit Transaction
-        if(target.closest('.edit-btn')) {
-            const id = target.closest('.edit-btn').dataset.id;
-            const tx = transactions.find(t => t.id === id);
-            if (tx) editTransaction(tx);
-        }
-        // Settle Debtor/Creditor
-        if(target.closest('.settle-btn')) {
-            openSettleModal(target.closest('.settle-btn'));
-        }
-        // ... add other delegated events here (receipts, delete buttons etc)
-    });
-}
-
-// --- MODIFIED: Forms to use API ---
+// EXAMPLE MODIFICATION for saving a new expense
 forms.expense.addEventListener('submit', async function (e) {
     e.preventDefault();
     const ex = {
@@ -404,45 +222,408 @@ forms.expense.addEventListener('submit', async function (e) {
         amount: parseFloat(document.getElementById('expenseAmount').value) || 0,
         payment_type: document.getElementById('expensePaymentType').value
     };
-    try {
-        await apiCall('addOrUpdate', { table: 'expenses', data: ex });
-        this.reset();
-        modals.expense.classList.remove('active');
-    } catch(error) { /* error already handled in apiCall */ }
+    await apiCall('addOrUpdate', { table: 'expenses', data: ex });
+    // Optimistically update UI or wait for real-time update
+    expenses.unshift(ex);
+    renderExpenses();
+    makeStatements();
+    this.reset();
+    modals.expense.style.display = 'none';
 });
 
-// MODIFIED: Edit Transaction to use ID
-function editTransaction(tx) {
-    // ... your form filling logic ...
-    document.getElementById('editingTransactionId').value = tx.id; // Store ID
-    // ...
-    showModal('transaction');
-}
+// You will need to apply similar changes to all other functions that save or edit data.
+// Replace `localStorage.setItem` with `apiCall`.
+// Replace `data-index` with `data-id`.
 
-// MODIFIED: Transaction form submission
-forms.transaction.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    // ... get all form values ...
-    const editingId = document.getElementById('editingTransactionId').value;
-    const txData = {
-        // ... all fields ...
-    };
-    if (editingId) {
-        txData.id = editingId;
-    }
-    await apiCall('addOrUpdate', { table: 'transactions', data: txData });
-    // ... close modal & reset form ...
-});
-
-// --- INITIALIZE THE APP ---
+// Your original init function, now called by the new logic
 function init() {
     updatePaymentTypeOptions();
+    // Your original rendering calls
     renderCategoryFilter();
     renderTransactions();
     renderExpenses();
     renderDebtors();
     renderCreditors();
     renderTransfers();
-    makeStatements(); // This will calculate balances and render charts
-    setupEventListeners(); // Setup delegated event listeners
+    makeStatements();
+    // Your original event listener setups
+    // ...
+}
+
+// =================================================================
+// ADDED: Minimal implementations for missing functions
+// =================================================================
+
+function renderCategoryFilter() {
+    const categorySelect = filters.category;
+    if (!categorySelect) return;
+    const uniqueCategories = Array.from(new Set(expenses.map(e => e.category).filter(Boolean))).sort();
+    const optionsHtml = ['<option value="">All</option>'].concat(uniqueCategories.map(c => `<option value="${c}">${c}</option>`)).join('');
+    categorySelect.innerHTML = optionsHtml;
+    categorySelect.onchange = () => renderExpenses();
+}
+
+function renderExpenses() {
+    if (!tables.expensesBody) return;
+    const selectedCategory = filters.category ? filters.category.value : '';
+    const filteredExpenses = expenses
+        .filter(ex => !selectedCategory || ex.category === selectedCategory)
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
+
+    tables.expensesBody.innerHTML = filteredExpenses.map(ex => {
+        const amount = Number(ex.amount) || 0;
+        const dateStr = ex.date ? new Date(ex.date).toLocaleDateString() : '';
+        return `
+            <tr>
+                <td>${dateStr}</td>
+                <td>${ex.category || ''}</td>
+                <td>${ex.item || ''}</td>
+                <td>₹${amount.toFixed(2)}</td>
+                <td>${ex.payment_type || ''}</td>
+                <td>—</td>
+                <td>—</td>
+            </tr>`;
+    }).join('');
+}
+
+function renderDebtors() {
+    const body = document.getElementById('debtorsBody');
+    if (!body) return;
+    const rowsHtml = (debtors || [])
+        .slice()
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .map(d => {
+            const amount = Number(d.amount) || 0;
+            const dateStr = d.date ? new Date(d.date).toLocaleDateString() : '';
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${d.name || ''}</td>
+                    <td>${d.phone || ''}</td>
+                    <td>₹${amount.toFixed(2)}</td>
+                    <td>${d.payment_type || ''}</td>
+                    <td>${d.description || ''}</td>
+                    <td>${d.status || 'Pending'}</td>
+                    <td>—</td>
+                </tr>`;
+        }).join('');
+    body.innerHTML = rowsHtml;
+}
+
+function renderCreditors() {
+    const body = document.getElementById('creditorsBody');
+    if (!body) return;
+    const rowsHtml = (creditors || [])
+        .slice()
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .map(c => {
+            const amount = Number(c.amount) || 0;
+            const dateStr = c.date ? new Date(c.date).toLocaleDateString() : '';
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${c.name || ''}</td>
+                    <td>${c.phone || ''}</td>
+                    <td>₹${amount.toFixed(2)}</td>
+                    <td>${c.payment_type || ''}</td>
+                    <td>${c.description || ''}</td>
+                    <td>${c.status || 'Pending'}</td>
+                    <td>—</td>
+                </tr>`;
+        }).join('');
+    body.innerHTML = rowsHtml;
+}
+
+function renderTransfers() {
+    if (!tables.transfersBody) return;
+    const rowsHtml = (transfers || [])
+        .slice()
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .map(t => {
+            const amount = Number(t.amount) || 0;
+            const dateStr = t.date ? new Date(t.date).toLocaleDateString() : '';
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${t.from || ''}</td>
+                    <td>${t.to || ''}</td>
+                    <td>₹${amount.toFixed(2)}</td>
+                    <td>${t.description || ''}</td>
+                    <td>—</td>
+                </tr>`;
+        }).join('');
+    tables.transfersBody.innerHTML = rowsHtml;
+}
+
+function resetTransactionForm() {
+    const form = forms.transaction;
+    if (!form) return;
+    form.reset();
+    const inContainer = document.getElementById('transInContainer');
+    const outContainer = document.getElementById('transOutContainer');
+    if (inContainer) inContainer.innerHTML = '';
+    if (outContainer) outContainer.innerHTML = '';
+    const deleteBtn = document.getElementById('deleteTransactionBtn');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    // Ensure one default split row for in/out
+    ensureDefaultSplitRows();
+}
+
+function ensureDefaultSplitRows() {
+    const inContainer = document.getElementById('transInContainer');
+    const outContainer = document.getElementById('transOutContainer');
+    if (inContainer && inContainer.children.length === 0) {
+        inContainer.appendChild(createSplitRow('in'));
+    }
+    if (outContainer && outContainer.children.length === 0) {
+        outContainer.appendChild(createSplitRow('out'));
+    }
+    updatePaymentTypeOptions();
+}
+
+function createSplitRow(direction) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'split-row';
+    const amountInput = document.createElement('input');
+    amountInput.type = 'number';
+    amountInput.min = '0';
+    amountInput.step = '0.01';
+    amountInput.placeholder = direction === 'in' ? 'Amount In' : 'Amount Out';
+    amountInput.className = direction === 'in' ? 'transInAmount' : 'transOutAmount';
+
+    const typeSelect = document.createElement('select');
+    typeSelect.className = direction === 'in' ? 'transInType' : 'transOutType';
+
+    wrapper.appendChild(amountInput);
+    wrapper.appendChild(typeSelect);
+    return wrapper;
+}
+
+function setupSplitPaymentButtons() {
+    ensureDefaultSplitRows();
+}
+
+function setupRemoveSplitButtons() {
+    // Minimal implementation: nothing to remove yet as we keep one row by default
+}
+
+function makeStatements() {
+    // Compute totals
+    let totalIncome = 0;
+    let totalOutFromTransactions = 0;
+    let totalExpenses = 0;
+
+    let cashBalance = 0;
+    const bankNameToBalance = {};
+
+    // Transactions in/out
+    (transactions || []).forEach(tx => {
+        const inPayments = Array.isArray(tx.in_payments) ? tx.in_payments : [];
+        const outPayments = Array.isArray(tx.out_payments) ? tx.out_payments : [];
+
+        inPayments.forEach(p => {
+            const amount = Number(p.amount) || 0;
+            totalIncome += amount;
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashBalance += amount;
+            } else if (p.type) {
+                bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) + amount;
+            }
+        });
+
+        outPayments.forEach(p => {
+            const amount = Number(p.amount) || 0;
+            totalOutFromTransactions += amount;
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashBalance -= amount;
+            } else if (p.type) {
+                bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) - amount;
+            }
+        });
+    });
+
+    // Standalone expenses
+    (expenses || []).forEach(ex => {
+        const amount = Number(ex.amount) || 0;
+        totalExpenses += amount;
+        const pType = (ex.payment_type || '').toLowerCase();
+        if (pType === 'cash') {
+            cashBalance -= amount;
+        } else if (ex.payment_type) {
+            bankNameToBalance[ex.payment_type] = (bankNameToBalance[ex.payment_type] || 0) - amount;
+        }
+    });
+
+    // Transfers between accounts do not affect net total, just move balances
+    (transfers || []).forEach(tr => {
+        const amount = Number(tr.amount) || 0;
+        const fromType = (tr.from || '').toLowerCase();
+        const toType = (tr.to || '').toLowerCase();
+        if (fromType === 'cash') cashBalance -= amount;
+        else if (tr.from) bankNameToBalance[tr.from] = (bankNameToBalance[tr.from] || 0) - amount;
+        if (toType === 'cash') cashBalance += amount;
+        else if (tr.to) bankNameToBalance[tr.to] = (bankNameToBalance[tr.to] || 0) + amount;
+    });
+
+    const totalTransactionalExpenses = totalOutFromTransactions + totalExpenses;
+    const netProfit = totalIncome - totalTransactionalExpenses;
+
+    // Update top stats
+    if (stats.income) stats.income.textContent = totalIncome.toFixed(2);
+    if (stats.expenses) stats.expenses.textContent = totalTransactionalExpenses.toFixed(2);
+    if (stats.profit) stats.profit.textContent = netProfit.toFixed(2);
+    if (stats.cash) stats.cash.textContent = cashBalance.toFixed(2);
+    const totalBankBalance = Object.values(bankNameToBalance).reduce((a, b) => a + b, 0);
+    if (stats.bank) stats.bank.textContent = totalBankBalance.toFixed(2);
+
+    const cashBalanceElem = document.getElementById('cashBalanceCash');
+    if (cashBalanceElem) cashBalanceElem.textContent = cashBalance.toFixed(2);
+
+    // Build cash statement
+    cashStatements = [];
+    (transactions || []).forEach(tx => {
+        (Array.isArray(tx.in_payments) ? tx.in_payments : []).forEach(p => {
+            const amount = Number(p.amount) || 0;
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: tx.date, description: tx.description || tx.name || 'Transaction In', in: amount, out: 0 });
+            }
+        });
+        (Array.isArray(tx.out_payments) ? tx.out_payments : []).forEach(p => {
+            const amount = Number(p.amount) || 0;
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: tx.date, description: tx.description || tx.name || 'Transaction Out', in: 0, out: amount });
+            }
+        });
+    });
+    (expenses || []).forEach(ex => {
+        const amount = Number(ex.amount) || 0;
+        if ((ex.payment_type || '').toLowerCase() === 'cash') {
+            cashStatements.push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: amount });
+        }
+    });
+    (transfers || []).forEach(tr => {
+        const amount = Number(tr.amount) || 0;
+        if ((tr.from || '').toLowerCase() === 'cash') {
+            cashStatements.push({ date: tr.date, description: tr.description || `Transfer to ${tr.to}`, in: 0, out: amount });
+        }
+        if ((tr.to || '').toLowerCase() === 'cash') {
+            cashStatements.push({ date: tr.date, description: tr.description || `Transfer from ${tr.from}`, in: amount, out: 0 });
+        }
+    });
+
+    cashStatements.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    let runningCash = 0;
+    const cashRowsHtml = cashStatements.map(entry => {
+        runningCash += Number(entry.in) - Number(entry.out);
+        return `
+            <tr>
+                <td>${entry.date ? new Date(entry.date).toLocaleDateString() : ''}</td>
+                <td>${entry.description || ''}</td>
+                <td>₹${(Number(entry.in) || 0).toFixed(2)}</td>
+                <td>₹${(Number(entry.out) || 0).toFixed(2)}</td>
+                <td>₹${runningCash.toFixed(2)}</td>
+            </tr>`;
+    }).join('');
+    if (tables.cashStatementBody) tables.cashStatementBody.innerHTML = cashRowsHtml;
+
+    // Build bank statements per bank
+    bankStatements = {};
+    const allBankNames = new Set(
+        banks.filter(b => b && b !== 'Cash' && b !== 'Bank (Generic)')
+            .concat(Object.keys(bankNameToBalance))
+    );
+
+    allBankNames.forEach(bankName => { bankStatements[bankName] = []; });
+
+    (transactions || []).forEach(tx => {
+        (Array.isArray(tx.in_payments) ? tx.in_payments : []).forEach(p => {
+            const amount = Number(p.amount) || 0;
+            if (p.type && (p.type || '').toLowerCase() !== 'cash') {
+                if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                bankStatements[p.type].push({ date: tx.date, description: tx.description || tx.name || 'Transaction In', in: amount, out: 0 });
+            }
+        });
+        (Array.isArray(tx.out_payments) ? tx.out_payments : []).forEach(p => {
+            const amount = Number(p.amount) || 0;
+            if (p.type && (p.type || '').toLowerCase() !== 'cash') {
+                if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                bankStatements[p.type].push({ date: tx.date, description: tx.description || tx.name || 'Transaction Out', in: 0, out: amount });
+            }
+        });
+    });
+    (expenses || []).forEach(ex => {
+        const amount = Number(ex.amount) || 0;
+        if (ex.payment_type && (ex.payment_type || '').toLowerCase() !== 'cash') {
+            if (!bankStatements[ex.payment_type]) bankStatements[ex.payment_type] = [];
+            bankStatements[ex.payment_type].push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: amount });
+        }
+    });
+    (transfers || []).forEach(tr => {
+        const amount = Number(tr.amount) || 0;
+        if (tr.from && (tr.from || '').toLowerCase() !== 'cash') {
+            if (!bankStatements[tr.from]) bankStatements[tr.from] = [];
+            bankStatements[tr.from].push({ date: tr.date, description: tr.description || `Transfer to ${tr.to}`, in: 0, out: amount });
+        }
+        if (tr.to && (tr.to || '').toLowerCase() !== 'cash') {
+            if (!bankStatements[tr.to]) bankStatements[tr.to] = [];
+            bankStatements[tr.to].push({ date: tr.date, description: tr.description || `Transfer from ${tr.from}`, in: amount, out: 0 });
+        }
+    });
+
+    // Render bank balances list
+    const bankBalancesElem = document.getElementById('bankBalances');
+    if (bankBalancesElem) {
+        const entries = Array.from(allBankNames).sort().map(bankName => {
+            const bal = bankNameToBalance[bankName] || 0;
+            return `<div class="bank-balance-item" data-bank="${bankName}" style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid #eee;cursor:pointer;">
+                        <span>${bankName}</span>
+                        <span>₹${bal.toFixed(2)}</span>
+                    </div>`;
+        }).join('');
+        bankBalancesElem.innerHTML = entries || '<div style="color:#777;">No banks yet</div>';
+
+        bankBalancesElem.onclick = (e) => {
+            const item = e.target.closest('[data-bank]');
+            if (!item) return;
+            const bankName = item.getAttribute('data-bank');
+            renderBankStatement(bankName);
+        };
+    }
+
+    // Default render first bank statement if exists
+    const firstBank = Object.keys(bankStatements)[0];
+    if (firstBank) renderBankStatement(firstBank);
+}
+
+function renderBankStatement(bankName) {
+    const selectedNameElem = document.getElementById('selectedBankName');
+    if (selectedNameElem) selectedNameElem.textContent = bankName || 'None';
+    const container = document.getElementById('bankStatementTableContainer');
+    if (!container) return;
+    const entries = (bankStatements[bankName] || []).slice().sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    let running = 0;
+    const rows = entries.map(en => {
+        running += Number(en.in) - Number(en.out);
+        return `<tr>
+            <td>${en.date ? new Date(en.date).toLocaleDateString() : ''}</td>
+            <td>${en.description || ''}</td>
+            <td>₹${(Number(en.in) || 0).toFixed(2)}</td>
+            <td>₹${(Number(en.out) || 0).toFixed(2)}</td>
+            <td>₹${running.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+    const tableHtml = `
+        <table class="desktop-view" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>In (₹)</th>
+                    <th>Out (₹)</th>
+                    <th>Balance (₹)</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    container.innerHTML = tableHtml;
 }
