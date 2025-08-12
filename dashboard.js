@@ -38,7 +38,17 @@ loginForm.addEventListener('submit', async (e) => {
     if (error) document.getElementById('auth-error').textContent = error.message;
 });
 
-logoutBtn.addEventListener('click', () => supabase.auth.signOut());
+logoutBtn.addEventListener('click', async () => {
+    try {
+        await supabase.auth.signOut();
+    } catch (err) {
+        console.error('Error during logout:', err);
+    } finally {
+        // Fallback UI switch in case the auth event is delayed
+        if (dashboardWrapper) dashboardWrapper.style.display = 'none';
+        if (authContainer) authContainer.style.display = 'flex';
+    }
+});
 
 supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || !session) {
