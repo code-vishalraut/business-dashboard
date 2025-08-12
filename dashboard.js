@@ -15,6 +15,7 @@ let cashStatements = [];
 let bankStatements = {};
 let balances = { cash: 0, bank: 0 };
 let realtimeChannel;
+let trendChart, bankPieChart;
 
 // --- DOM Elements ---
 const authContainer = document.getElementById('auth-container');
@@ -285,13 +286,141 @@ function init() {
     renderTransfers();
     makeStatements();
     // Your original event listener setups
-    // ...
+    // Add these lines inside the init() function
+    document.getElementById('chartPeriod').addEventListener('change', updateTrendChart);
+    document.getElementById('chartDataType').addEventListener('change', updateTrendChart);
 }
 
 // =================================================================
 // ADDED: Minimal implementations for missing functions
 // =================================================================
 
+function updateTrendChart() {
+    const period = parseInt(document.getElementById('chartPeriod').value) || 30;
+    const dataType = document.getElementById('chartDataType').value || 'profit';
+    const ctx = document.getElementById('trendChart').getContext('2d');
+
+    // Prepare data
+    const labels = [];
+    const dataPoints = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = period - 1; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        labels.push(date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }));
+
+        let dayTotal = 0;
+        // This is a simplified calculation. You can make it more detailed.
+        if (dataType === 'income') {
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    dayTotal += (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                }
+            });
+        } else if (dataType === 'expense') {
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    dayTotal += Number(ex.amount);
+                }
+            });
+        }
+        dataPoints.push(dayTotal);
+    }
+
+    // Destroy the old chart if it exists
+    if (trendChart) {
+        trendChart.destroy();
+    }
+
+    // Create the new chart
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: dataType.charAt(0).toUpperCase() + dataType.slice(1),
+                data: dataPoints,
+                borderColor: 'rgb(0, 150, 136)',
+                backgroundColor: 'rgba(0, 150, 136, 0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function updateBankPieChart() {
+    const ctx = document.getElementById('bankPieChart').getContext('2d');
+    const bankBalances = {};
+
+    // Calculate balances from transactions
+    transactions.forEach(tx => {
+        (tx.in_payments || []).forEach(p => {
+            if (p.type !== 'Cash') {
+                bankBalances[p.type] = (bankBalances[p.type] || 0) + Number(p.amount);
+            }
+        });
+        (tx.out_payments || []).forEach(p => {
+            if (p.type !== 'Cash') {
+                bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount);
+            }
+        });
+    });
+
+    // Subtract expenses paid from banks
+    expenses.forEach(ex => {
+        if (ex.payment_type !== 'Cash') {
+            bankBalances[ex.payment_type] = (bankBalances[ex.payment_type] || 0) - Number(ex.amount);
+        }
+    });
+
+    const labels = Object.keys(bankBalances);
+    const data = Object.values(bankBalances);
+
+    if (bankPieChart) {
+        bankPieChart.destroy();
+    }
+
+    bankPieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Bank Balance',
+                data: data,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)',
+                    'rgba(255, 159, 64, 0.8)'
+                ],
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+}
 function renderCategoryFilter() {
     const categorySelect = filters.category;
     if (!categorySelect) return;
@@ -651,6 +780,10 @@ function makeStatements() {
     // Default render first bank statement if exists
     const firstBank = Object.keys(bankStatements)[0];
     if (firstBank) renderBankStatement(firstBank);
+
+    // Add these lines at the end of the makeStatements() function
+    updateTrendChart();
+    updateBankPieChart();
 }
 
 function renderBankStatement(bankName) {
