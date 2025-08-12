@@ -137,6 +137,32 @@ document.querySelectorAll('.modal .close-btn').forEach(btn => {
     });
 });
 
+// --- Open Form Modals (Add buttons) ---
+const addTransactionBtn = document.getElementById('addTransactionBtn');
+if (addTransactionBtn) {
+    addTransactionBtn.addEventListener('click', () => {
+        resetTransactionForm();
+        ensureDefaultSplitRows();
+        showModal('transaction');
+    });
+}
+
+buttons.quickAddTrans && buttons.quickAddTrans.addEventListener('click', () => {
+    resetTransactionForm();
+    ensureDefaultSplitRows();
+    showModal('transaction');
+});
+
+buttons.addExpense && buttons.addExpense.addEventListener('click', () => showModal('expense'));
+buttons.addDebtor && buttons.addDebtor.addEventListener('click', () => showModal('debtor'));
+buttons.addCreditor && buttons.addCreditor.addEventListener('click', () => showModal('creditor'));
+buttons.addTransfer && buttons.addTransfer.addEventListener('click', () => showModal('transfer'));
+
+buttons.quickAddExpense && buttons.quickAddExpense.addEventListener('click', () => showModal('expense'));
+buttons.quickAddDebtor && buttons.quickAddDebtor.addEventListener('click', () => showModal('debtor'));
+buttons.quickAddCreditor && buttons.quickAddCreditor.addEventListener('click', () => showModal('creditor'));
+buttons.quickAddTransfer && buttons.quickAddTransfer.addEventListener('click', () => showModal('transfer'));
+
 // --- Update Payment/Bank Type Options ---
 function updatePaymentTypeOptions() {
     const bankOpts = banks.filter(b => b !== 'Cash' && b !== 'Bank (Generic)').map(b => `<option value="${b}">${b}</option>`).join('');
@@ -213,23 +239,25 @@ function renderTransactions() {
 }
 
 // EXAMPLE MODIFICATION for saving a new expense
-forms.expense.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const ex = {
-        date: document.getElementById('expenseDate').value,
-        category: document.getElementById('expenseCategory').value,
-        item: document.getElementById('expenseItem').value,
-        amount: parseFloat(document.getElementById('expenseAmount').value) || 0,
-        payment_type: document.getElementById('expensePaymentType').value
-    };
-    await apiCall('addOrUpdate', { table: 'expenses', data: ex });
-    // Optimistically update UI or wait for real-time update
-    expenses.unshift(ex);
-    renderExpenses();
-    makeStatements();
-    this.reset();
-    modals.expense.style.display = 'none';
-});
+if (forms.expense) {
+    forms.expense.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const ex = {
+            date: document.getElementById('expenseDate').value,
+            category: document.getElementById('expenseCategory').value,
+            item: document.getElementById('expenseItem').value,
+            amount: parseFloat(document.getElementById('expenseAmount').value) || 0,
+            payment_type: document.getElementById('expensePaymentType').value
+        };
+        await apiCall('addOrUpdate', { table: 'expenses', data: ex });
+        // Optimistically update UI or wait for real-time update
+        expenses.unshift(ex);
+        renderExpenses();
+        makeStatements();
+        this.reset();
+        modals.expense.style.display = 'none';
+    });
+}
 
 // You will need to apply similar changes to all other functions that save or edit data.
 // Replace `localStorage.setItem` with `apiCall`.
