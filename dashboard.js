@@ -419,21 +419,41 @@ function ensureDefaultSplitRows() {
     updatePaymentTypeOptions();
 }
 
+// Find the old createSplitRow function and replace it with this one.
 function createSplitRow(direction) {
     const wrapper = document.createElement('div');
-    wrapper.className = 'split-row';
+    wrapper.className = 'split-payment-row';
+
     const amountInput = document.createElement('input');
     amountInput.type = 'number';
     amountInput.min = '0';
     amountInput.step = '0.01';
-    amountInput.placeholder = direction === 'in' ? 'Amount In' : 'Amount Out';
+    amountInput.value = '0';
+    amountInput.placeholder = 'Amount';
     amountInput.className = direction === 'in' ? 'transInAmount' : 'transOutAmount';
 
     const typeSelect = document.createElement('select');
     typeSelect.className = direction === 'in' ? 'transInType' : 'transOutType';
 
+    // --- THIS IS THE FIX ---
+    // It now correctly populates the dropdown menu with your banks
+    const bankOpts = banks.filter(b => b !== 'Cash').map(b => `<option value="${b}">${b}</option>`).join('');
+    typeSelect.innerHTML = `<option value="Cash">Cash</option>${bankOpts}`;
+    // --- END OF FIX ---
+
+    const addButton = document.createElement('button');
+    addButton.type = 'button';
+    addButton.className = 'add-split-btn';
+    addButton.innerHTML = '<i class="fas fa-plus"></i>';
+    addButton.onclick = () => {
+        const containerId = direction === 'in' ? 'transInContainer' : 'transOutContainer';
+        document.getElementById(containerId).appendChild(createSplitRow(direction));
+    };
+
     wrapper.appendChild(amountInput);
     wrapper.appendChild(typeSelect);
+    wrapper.appendChild(addButton);
+
     return wrapper;
 }
 
