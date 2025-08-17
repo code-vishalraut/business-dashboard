@@ -582,6 +582,51 @@ forms.transaction.addEventListener('submit', async function (e) {
     }
 });
 
+
+function editTransaction(txId) {
+    const transaction = transactions.find(t => t.id === txId);
+    if (!transaction) {
+        alert('Transaction not found!');
+        return;
+    }
+
+    // Populate the form with the transaction's data
+    document.getElementById('transDate').value = new Date(transaction.date).toISOString().slice(0, 16);
+    document.getElementById('transName').value = transaction.name;
+    document.getElementById('transPhone').value = transaction.phone || '';
+    document.getElementById('transDesc').value = transaction.description;
+    document.getElementById('transStatus').value = transaction.status;
+    document.getElementById('transNotes').value = transaction.notes || '';
+
+    // Store the ID for saving later
+    forms.transaction.dataset.editingId = txId;
+
+    // Change modal title and show delete button
+    document.getElementById('transactionModalTitle').textContent = 'Edit Transaction';
+    buttons.deleteTransaction.style.display = 'block';
+
+    // Populate split payment rows
+    const inContainer = document.getElementById('transInContainer');
+    inContainer.innerHTML = ''; // Clear previous rows
+    (transaction.in_payments && transaction.in_payments.length > 0 ? transaction.in_payments : [{ amount: 0, type: 'Cash' }]).forEach(p => {
+        const row = createSplitRow('in');
+        row.querySelector('.transInAmount').value = p.amount;
+        row.querySelector('.transInType').value = p.type;
+        inContainer.appendChild(row);
+    });
+
+    const outContainer = document.getElementById('transOutContainer');
+    outContainer.innerHTML = ''; // Clear previous rows
+    (transaction.out_payments && transaction.out_payments.length > 0 ? transaction.out_payments : [{ amount: 0, type: 'Cash' }]).forEach(p => {
+        const row = createSplitRow('out');
+        row.querySelector('.transOutAmount').value = p.amount;
+        row.querySelector('.transOutType').value = p.type;
+        outContainer.appendChild(row);
+    });
+
+    showModal('transaction');
+}
+
 // Add this function to show the receipt modal
 function showReceipt(txId) {
     const transaction = transactions.find(t => t.id === txId);

@@ -278,6 +278,65 @@
         <div class="modal" id="receiptModal">
             <div class="receipt-container-v2">
                 <div class="receipt-body-v2">
+                    <div class="receipt-header-v2">
+                        <div class="receipt-logo-v2">
+                            <img src="pf.JPG" alt="Business Logo">
+                        </div>
+                        <div class="receipt-store-details-v2">
+                            <h2>Digital World</h2>
+                            <p>Phone: 7547034664</p>
+                            <p>Email: support@digitalworld.com</p>
+                            <p>Web: www.digitalworld.com</p>
+                        </div>
+                    </div>
+                    <div class="receipt-title-v2">
+                        <span>RECEIPT</span>
+                    </div>
+        
+                    <div class="receipt-client-info-v2">
+                        <div class="client-details">
+                            <p><strong>Client Information:</strong></p>
+                            <p>Name: <span id="receiptClientName"></span></p>
+                            <p>Address: <span id="receiptClientAddress">N/A</span></p>
+                            <p>Phone: <span id="receiptClientPhone"></span></p>
+                        </div>
+                        <div class="receipt-date-info">
+                            <p>Date: <span id="receiptDate"></span></p>
+                            <p>No.: <span id="receiptNo"></span></p>
+                        </div>
+                    </div>
+        
+                    <table class="receipt-items-table-v2">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Item Description</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receiptItemsBody">
+                        </tbody>
+                    </table>
+        
+                    <div class="receipt-totals-v2">
+                        <div class="total-row">
+                            <span class="total-label">Sub Total</span>
+                            <span class="total-value" id="receiptSubTotal"></span>
+                        </div>
+                        <div class="total-row">
+                            <span class="total-label">Taxes Total</span>
+                            <span class="total-value" id="receiptTaxes"></span>
+                        </div>
+                        <div class="total-row grand-total">
+                            <span class="total-label">Total</span>
+                            <span class="total-value" id="receiptGrandTotal"></span>
+                        </div>
+                    </div>
+        
+                    <div class="receipt-footer-v2">
+                        <p>Goods/Payment once received cannot be returned.</p>
+                        <p>Thank you for your business!</p>
+                    </div>
                 </div>
                 <div class="receipt-actions">
                     <button id="printReceiptBtn"><i class="fas fa-print"></i> Print</button>
