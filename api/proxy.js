@@ -1,4 +1,4 @@
-// /api/proxy.js (with full functionality)
+// /api/proxy.js (Final Corrected Version)
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
@@ -13,6 +13,15 @@ export default async function handler(req, res) {
         const supabase = createClient(
             process.env.SUPABASE_URL,
             process.env.SUPABASE_SERVICE_KEY,
+            // --- THIS IS THE FIX ---
+            // These options tell the Supabase client how to behave in a serverless environment
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+            // --- END OF FIX ---
         );
 
         // Get the user's token from the Authorization header
@@ -26,7 +35,7 @@ export default async function handler(req, res) {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
         if (userError || !user) {
             console.error('Token validation failed:', userError);
-            return res.status(401).json({ error: 'Invalid or expired token' });
+            return res.status(401).json({ error: userError.message || 'Invalid or expired token' });
         }
 
         const userId = user.id;
@@ -44,7 +53,6 @@ export default async function handler(req, res) {
                     supabase.from('banks').select('*').eq('user_id', userId),
                 ]);
 
-                // Check for errors in any of the fetches
                 const errors = [transactions, expenses, debtors, creditors, transfers, banks]
                     .map(result => result.error).filter(Boolean);
                 if (errors.length > 0) {
@@ -61,20 +69,18 @@ export default async function handler(req, res) {
                 });
 
             case 'addOrUpdate':
-                // This new case handles adding and updating data
                 ({ data, error } = await supabase
                     .from(payload.table)
-                    .upsert({ ...payload.data, user_id: userId }) // 'upsert' creates if it doesn't exist, updates if it does
+                    .upsert({ ...payload.data, user_id: userId })
                     .select()
                     .single());
                 break;
 
             case 'delete':
-                // This new case handles deleting data
                 ({ error } = await supabase
                     .from(payload.table)
                     .delete()
-                    .eq('user_id', userId) // Security check to ensure user owns the record
+                    .eq('user_id', userId)
                     .eq('id', payload.id));
                 break;
 
