@@ -285,6 +285,7 @@ function init() {
     renderCreditors();
     renderTransfers();
     makeStatements();
+    setupEventListeners();
     // Your original event listener setups
     // Add these lines inside the init() function
     document.getElementById('chartPeriod').addEventListener('change', updateTrendChart);
@@ -580,6 +581,61 @@ forms.transaction.addEventListener('submit', async function (e) {
         alert('Failed to save transaction. Please check the console for a detailed red error message.');
     }
 });
+
+// Add this function to show the receipt modal
+function showReceipt(txId) {
+    const transaction = transactions.find(t => t.id === txId);
+    if (!transaction) {
+        alert('Transaction not found!');
+        return;
+    }
+
+    // Populate receipt fields from the transaction object
+    document.getElementById('receiptClientName').textContent = transaction.name;
+    document.getElementById('receiptClientPhone').textContent = transaction.phone || 'N/A';
+    document.getElementById('receiptDate').textContent = new Date(transaction.date).toLocaleDateString();
+    document.getElementById('receiptNo').textContent = transaction.id.slice(0, 8);
+
+    const itemsBody = document.getElementById('receiptItemsBody');
+    const inTotal = (transaction.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+
+    itemsBody.innerHTML = `
+        <tr>
+            <td>1</td>
+            <td>${transaction.description}</td>
+            <td>₹${inTotal.toFixed(2)}</td>
+        </tr>
+    `;
+
+    document.getElementById('receiptSubTotal').textContent = `₹${inTotal.toFixed(2)}`;
+    document.getElementById('receiptTaxes').textContent = `₹0.00`;
+    document.getElementById('receiptGrandTotal').textContent = `₹${inTotal.toFixed(2)}`;
+
+    showModal('receiptModal');
+}
+
+// Add this function to handle all button clicks in the table
+function setupEventListeners() {
+    document.body.addEventListener('click', (e) => {
+        // Handle Edit Button clicks
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) {
+            const txId = editBtn.dataset.id;
+            if (txId) {
+                editTransaction(txId);
+            }
+        }
+
+        // Handle Receipt Button clicks
+        const receiptBtn = e.target.closest('.receipt-btn');
+        if (receiptBtn) {
+            const txId = receiptBtn.dataset.id;
+            if (txId) {
+                showReceipt(txId);
+            }
+        }
+    });
+}
 
 function resetTransactionForm() {
     const form = forms.transaction;
