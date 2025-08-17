@@ -821,6 +821,33 @@ buttons.printReceipt.addEventListener('click', () => {
         printWindow.print();
     }
 });
+function handlePrintReceipt() {
+    const receiptContent = document.querySelector("#receiptModal .receipt-body-v2");
+    if (!receiptContent) {
+        console.error('Receipt content not found!');
+        return;
+    }
+
+    const printWindow = window.open('', '', 'height=800,width=800');
+
+    // Copy all style rules from the main page to the new window
+    document.querySelectorAll('link[rel="stylesheet"], style').forEach(node => {
+        printWindow.document.head.appendChild(node.cloneNode(true));
+    });
+
+    printWindow.document.body.innerHTML = receiptContent.innerHTML;
+
+    // Use the 'afterprint' event to close the window, which is more reliable
+    printWindow.addEventListener('afterprint', () => {
+        printWindow.close();
+    });
+
+    // Wait for the content to fully load before printing
+    printWindow.onload = () => {
+        printWindow.focus(); // Required for some browsers
+        printWindow.print();
+    };
+}
 
     // Populate Totals
     document.getElementById('receiptSubTotal').textContent = `₹${totalAmount.toFixed(2)}`;
@@ -1281,6 +1308,11 @@ function setupEventListeners() {
                 showReceipt('transaction', transactions.find(t => t.id === txId));
             }
         }
+        // Inside the setupEventListeners function in dashboard.js
+const printBtn = document.getElementById('printReceiptBtn');
+if (printBtn) {
+    printBtn.addEventListener('click', handlePrintReceipt);
+}
         
     });
 }
