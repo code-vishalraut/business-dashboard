@@ -260,6 +260,7 @@ if (forms.expense) {
             amount: parseFloat(document.getElementById('expenseAmount').value) || 0,
             payment_type: document.getElementById('expensePaymentType').value
         };
+        // ADDED: Use apiCall to save expense to Supabase
         await apiCall('addOrUpdate', { table: 'expenses', data: ex });
         // Optimistically update UI or wait for real-time update
         expenses.unshift(ex);
@@ -267,6 +268,85 @@ if (forms.expense) {
         makeStatements();
         this.reset();
         modals.expense.style.display = 'none';
+    });
+}
+
+// ADDED: forms.debtor.addEventListener with Supabase integration
+if (forms.debtor) {
+    forms.debtor.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const d = {
+            date: document.getElementById('debtorDate').value,
+            name: document.getElementById('debtorName').value,
+            phone: document.getElementById('debtorPhone').value,
+            amount: parseFloat(document.getElementById('debtorAmount').value) || 0,
+            payment_type: document.getElementById('debtorPaymentType').value,
+            description: document.getElementById('debtorDesc').value,
+            status: 'Pending'
+        };
+        try {
+            await apiCall('addOrUpdate', { table: 'debtors', data: d });
+            debtors.unshift(d);
+            renderDebtors();
+            makeStatements();
+            this.reset();
+            modals.debtor.style.display = 'none';
+        } catch (error) {
+            console.error("Error saving debtor:", error);
+            alert('Failed to save debtor. Please check the console.');
+        }
+    });
+}
+
+// ADDED: forms.creditor.addEventListener with Supabase integration
+if (forms.creditor) {
+    forms.creditor.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const c = {
+            date: document.getElementById('creditorDate').value,
+            name: document.getElementById('creditorName').value,
+            phone: document.getElementById('creditorPhone').value,
+            amount: parseFloat(document.getElementById('creditorAmount').value) || 0,
+            payment_type: document.getElementById('creditorPaymentType').value,
+            description: document.getElementById('creditorDesc').value,
+            status: 'Pending'
+        };
+        try {
+            await apiCall('addOrUpdate', { table: 'creditors', data: c });
+            creditors.unshift(c);
+            renderCreditors();
+            makeStatements();
+            this.reset();
+            modals.creditor.style.display = 'none';
+        } catch (error) {
+            console.error("Error saving creditor:", error);
+            alert('Failed to save creditor. Please check the console.');
+        }
+    });
+}
+
+// ADDED: forms.transfer.addEventListener with Supabase integration
+if (forms.transfer) {
+    forms.transfer.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const t = {
+            date: document.getElementById('transferDate').value,
+            from: document.getElementById('transferFrom').value,
+            to: document.getElementById('transferTo').value,
+            amount: parseFloat(document.getElementById('transferAmount').value) || 0,
+            description: document.getElementById('transferDesc').value
+        };
+        try {
+            await apiCall('addOrUpdate', { table: 'transfers', data: t });
+            transfers.unshift(t);
+            renderTransfers();
+            makeStatements();
+            this.reset();
+            modals.transfer.style.display = 'none';
+        } catch (error) {
+            console.error("Error saving transfer:", error);
+            alert('Failed to save transfer. Please check the console.');
+        }
     });
 }
 
@@ -448,10 +528,20 @@ function renderExpenses() {
                 <td>${ex.item || ''}</td>
                 <td>₹${amount.toFixed(2)}</td>
                 <td>${ex.payment_type || ''}</td>
-                <td>—</td>
+                <td><button class="receipt-btn" data-type="expense" data-id="${ex.id}"><i class="fas fa-receipt"></i></button></td>
                 <td>—</td>
             </tr>`;
     }).join('');
+    // ADDED: Event listener for expense receipt buttons
+    document.querySelectorAll('#expensesBody .receipt-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const expenseId = this.getAttribute('data-id');
+            const expense = expenses.find(e => e.id === expenseId);
+            if (expense) {
+                showReceipt('expense', expense);
+            }
+        });
+    });
 }
 
 function renderDebtors() {
@@ -460,7 +550,7 @@ function renderDebtors() {
     const rowsHtml = (debtors || [])
         .slice()
         .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
-        .map(d => {
+        .map((d, index) => {
             const amount = Number(d.amount) || 0;
             const dateStr = d.date ? new Date(d.date).toLocaleDateString() : '';
             return `
@@ -472,10 +562,20 @@ function renderDebtors() {
                     <td>${d.payment_type || ''}</td>
                     <td>${d.description || ''}</td>
                     <td>${d.status || 'Pending'}</td>
-                    <td>—</td>
+                    <td><button class="settle-btn" data-type="debtor" data-id="${d.id}" ${d.status === 'Settled' ? 'disabled' : ''}>${d.status === 'Settled' ? 'Settled' : 'Settle'}</button></td>
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
+    // ADDED: Event listener for debtor settle buttons
+    document.querySelectorAll('#debtorsBody .settle-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const debtorId = this.getAttribute('data-id');
+            const debtor = debtors.find(d => d.id === debtorId);
+            if (debtor) {
+                openSettleModal('debtor', debtorId); // Pass type and ID
+            }
+        });
+    });
 }
 
 function renderCreditors() {
@@ -484,7 +584,7 @@ function renderCreditors() {
     const rowsHtml = (creditors || [])
         .slice()
         .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
-        .map(c => {
+        .map((c, index) => {
             const amount = Number(c.amount) || 0;
             const dateStr = c.date ? new Date(c.date).toLocaleDateString() : '';
             return `
@@ -496,10 +596,20 @@ function renderCreditors() {
                     <td>${c.payment_type || ''}</td>
                     <td>${c.description || ''}</td>
                     <td>${c.status || 'Pending'}</td>
-                    <td>—</td>
+                    <td><button class="settle-btn" data-type="creditor" data-id="${c.id}" ${c.status === 'Settled' ? 'disabled' : ''}>${c.status === 'Settled' ? 'Settled' : 'Settle'}</button></td>
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
+    // ADDED: Event listener for creditor settle buttons
+    document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const creditorId = this.getAttribute('data-id');
+            const creditor = creditors.find(c => c.id === creditorId);
+            if (creditor) {
+                openSettleModal('creditor', creditorId);
+            }
+        });
+    });
 }
 
 function renderTransfers() {
@@ -627,36 +737,74 @@ function editTransaction(txId) {
     showModal('transaction');
 }
 
-// Add this function to show the receipt modal
-function showReceipt(txId) {
-    const transaction = transactions.find(t => t.id === txId);
-    if (!transaction) {
-        alert('Transaction not found!');
-        return;
-    }
+// ADDED: Delete Transaction Logic with Supabase
+buttons.deleteTransaction.addEventListener('click', async function () {
+    const txId = forms.transaction.dataset.editingId;
+    if (!txId) return;
 
-    // Populate receipt fields from the transaction object
-    document.getElementById('receiptClientName').textContent = transaction.name;
-    document.getElementById('receiptClientPhone').textContent = transaction.phone || 'N/A';
-    document.getElementById('receiptDate').textContent = new Date(transaction.date).toLocaleDateString();
-    document.getElementById('receiptNo').textContent = transaction.id.slice(0, 8);
+    if (confirm('Are you sure you want to delete this transaction? This cannot be undone.')) {
+        try {
+            await apiCall('delete', { table: 'transactions', id: txId });
+            transactions = transactions.filter(t => t.id !== txId); // Update local array
+            renderTransactions();
+            makeStatements();
+            modals.transaction.style.display = 'none';
+            resetTransactionForm();
+            alert('Transaction deleted successfully.');
+        } catch (error) {
+            console.error("Error deleting transaction:", error);
+            alert('Failed to delete transaction. Please check the console.');
+        }
+    }
+});
+
+
+function showReceipt(type, data) {
+    if (type !== 'transaction' && type !== 'expense') return;
+
+    // Populate Client Info
+    document.getElementById('receiptClientName').textContent = data.name || data.category || 'N/A';
+    document.getElementById('receiptClientPhone').textContent = data.phone || 'N/A';
+
+    // Populate Date & No.
+    document.getElementById('receiptDate').textContent = new Date(data.date).toLocaleDateString();
+    document.getElementById('receiptNo').textContent = (data.id ? data.id.slice(0, 8) : 'DW-' + (Math.floor(Math.random() * 9000) + 1000));
 
     const itemsBody = document.getElementById('receiptItemsBody');
-    const inTotal = (transaction.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+    itemsBody.innerHTML = ''; // Clear previous items
 
-    itemsBody.innerHTML = `
-        <tr>
-            <td>1</td>
-            <td>${transaction.description}</td>
-            <td>₹${inTotal.toFixed(2)}</td>
-        </tr>
-    `;
+    let totalAmount = 0;
+    let itemNumber = 1;
 
-    document.getElementById('receiptSubTotal').textContent = `₹${inTotal.toFixed(2)}`;
-    document.getElementById('receiptTaxes').textContent = `₹0.00`;
-    document.getElementById('receiptGrandTotal').textContent = `₹${inTotal.toFixed(2)}`;
+    if (type === 'transaction') {
+        if (data.in_payments && data.in_payments.length > 0) {
+            const amount = data.in_payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            totalAmount += amount;
+            const row = `
+                <tr>
+                    <td>${itemNumber++}</td>
+                    <td>${data.description || 'General Transaction'}</td>
+                    <td>₹${amount.toFixed(2)}</td>
+                </tr>`;
+            itemsBody.innerHTML += row;
+        }
+    } else if (type === 'expense') {
+        totalAmount = data.amount || 0;
+        const row = `
+            <tr>
+                <td>${itemNumber++}</td>
+                <td>${data.category}: ${data.item}</td>
+                <td>₹${totalAmount.toFixed(2)}</td>
+            </tr>`;
+        itemsBody.innerHTML = row;
+    }
 
-    showModal('receiptModal');
+    // Populate Totals
+    document.getElementById('receiptSubTotal').textContent = `₹${totalAmount.toFixed(2)}`;
+    document.getElementById('receiptTaxes').textContent = `₹0.00`; // Tax not in data
+    document.getElementById('receiptGrandTotal').textContent = `₹${totalAmount.toFixed(2)}`;
+
+    showModal('receipt'); // Changed from 'receiptModal' to 'receipt'
 }
 
 // Add this function to handle all button clicks in the table
@@ -676,7 +824,7 @@ function setupEventListeners() {
         if (receiptBtn) {
             const txId = receiptBtn.dataset.id;
             if (txId) {
-                showReceipt(txId);
+                showReceipt('transaction', transactions.find(t => t.id === txId));
             }
         }
     });
@@ -829,13 +977,14 @@ function makeStatements() {
     // Build cash statement
     cashStatements = [];
     (transactions || []).forEach(tx => {
-        (Array.isArray(tx.in_payments) ? tx.in_payments : []).forEach(p => {
+        const { date, name, description, in_payments, out_payments } = tx;
+        (Array.isArray(in_payments) ? in_payments : []).forEach(p => {
             const amount = Number(p.amount) || 0;
             if ((p.type || '').toLowerCase() === 'cash') {
                 cashStatements.push({ date: tx.date, description: tx.description || tx.name || 'Transaction In', in: amount, out: 0 });
             }
         });
-        (Array.isArray(tx.out_payments) ? tx.out_payments : []).forEach(p => {
+        (Array.isArray(out_payments) ? out_payments : []).forEach(p => {
             const amount = Number(p.amount) || 0;
             if ((p.type || '').toLowerCase() === 'cash') {
                 cashStatements.push({ date: tx.date, description: tx.description || tx.name || 'Transaction Out', in: 0, out: amount });
@@ -855,6 +1004,30 @@ function makeStatements() {
         }
         if ((tr.to || '').toLowerCase() === 'cash') {
             cashStatements.push({ date: tr.date, description: tr.description || `Transfer from ${tr.from}`, in: amount, out: 0 });
+        }
+    });
+
+    // Process Debtors (Loan Given -> Money OUT)
+    (debtors || []).forEach(d => {
+        if (d.status !== 'Settled') {
+            const amount = Number(d.amount) || 0;
+            if ((d.payment_type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+            } else if (d.payment_type && bankNameToBalance[d.payment_type]) {
+                bankStatements[d.payment_type].push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+            }
+        }
+    });
+
+    // Process Creditors (Loan Taken -> Money IN)
+    (creditors || []).forEach(c => {
+        if (c.status !== 'Settled') {
+            const amount = Number(c.amount) || 0;
+            if ((c.payment_type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+            } else if (c.payment_type && bankNameToBalance[c.payment_type]) {
+                bankStatements[c.payment_type].push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+            }
         }
     });
 
@@ -915,6 +1088,28 @@ function makeStatements() {
             if (!bankStatements[tr.to]) bankStatements[tr.to] = [];
             bankStatements[tr.to].push({ date: tr.date, description: tr.description || `Transfer from ${tr.from}`, in: amount, out: 0 });
         }
+    });
+    (debtors || []).forEach(d => {
+        if (d.status !== 'Settled') {
+            const amount = Number(d.amount) || 0;
+            if (d.payment_type && (d.payment_type || '').toLowerCase() !== 'cash') {
+                if (!bankStatements[d.payment_type]) bankStatements[d.payment_type] = [];
+                bankStatements[d.payment_type].push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+            }
+        }
+    });
+    (creditors || []).forEach(c => {
+        if (c.status !== 'Settled') {
+            const amount = Number(c.amount) || 0;
+            if (c.payment_type && (c.payment_type || '').toLowerCase() !== 'cash') {
+                if (!bankStatements[c.payment_type]) bankStatements[c.payment_type] = [];
+                bankStatements[c.payment_type].push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+            }
+        }
+    });
+
+    Object.values(bankStatements).forEach(statements => {
+        statements.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     });
 
     // Render bank balances list
@@ -978,3 +1173,111 @@ function renderBankStatement(bankName) {
         </table>`;
     container.innerHTML = tableHtml;
 }
+
+// --- Settle Debt Logic ---
+async function openSettleModal(type, id) {
+    const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
+    if (!item) return;
+
+    const modalTitle = document.getElementById('settleModalTitle');
+    if (modalTitle) modalTitle.textContent = `Settle ${type}`;
+
+    document.getElementById('settleDate').value = new Date().toISOString().slice(0, 16);
+    document.getElementById('settleAmount').value = item.amount;
+    document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
+    document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
+
+    forms.settle.dataset.editingId = id;
+    showModal('settle');
+}
+
+forms.settle.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const editingId = this.dataset.editingId;
+
+    const settleData = {
+        date: document.getElementById('settleDate').value,
+        amount: parseFloat(document.getElementById('settleAmount').value) || 0,
+        payment_type: document.getElementById('settlePaymentType').value,
+        description: document.getElementById('settleDescription').value,
+        status: 'Settled' // Assuming settlement means settled
+    };
+
+    if (editingId) {
+        settleData.id = editingId;
+    }
+
+    try {
+        const savedSettle = await apiCall('addOrUpdate', { table: 'debtors', data: settleData });
+        if (type === 'debtor') {
+            debtors = debtors.map(d => d.id === editingId ? savedSettle : d);
+            renderDebtors();
+        } else {
+            creditors = creditors.map(c => c.id === editingId ? savedSettle : c);
+            renderCreditors();
+        }
+        makeStatements();
+        modals.settle.style.display = 'none';
+        resetSettleForm();
+        alert(`${type} settled successfully.`);
+    } catch (error) {
+        console.error("Error settling debt:", error);
+        alert('Failed to settle debt. Please check the console.');
+    }
+});
+
+function resetSettleForm() {
+    const form = forms.settle;
+    if (!form) return;
+    form.reset();
+    const deleteBtn = document.getElementById('deleteSettleBtn');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+}
+
+function setupRemoveSplitButtons() {
+    // Minimal implementation: nothing to remove yet as we keep one row by default
+}
+
+// Add this function to handle all button clicks in the table
+function setupEventListeners() {
+    document.body.addEventListener('click', (e) => {
+        // Handle Edit Button clicks
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) {
+            const txId = editBtn.dataset.id;
+            if (txId) {
+                editTransaction(txId);
+            }
+        }
+
+        // Handle Receipt Button clicks
+        const receiptBtn = e.target.closest('.receipt-btn');
+        if (receiptBtn) {
+            const txId = receiptBtn.dataset.id;
+            if (txId) {
+                showReceipt('transaction', transactions.find(t => t.id === txId));
+            }
+        }
+    });
+}
+
+/*buttons.reset.addEventListener('click', async function () {
+    if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+        try {
+            await apiCall('clearAllData'); // Assuming a 'clearAllData' action in your proxy
+            transactions = [];
+            expenses = [];
+            debtors = [];
+            creditors = [];
+            transfers = [];
+            banks = ['Bank (Generic)'];
+            categories = [];
+            init();
+            alert('All data reset successfully.');
+        } catch (error) {
+            console.error("Error resetting data:", error);
+            alert('Failed to reset data. Please check the console.');
+        }
+    }
+});
+*/
