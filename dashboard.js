@@ -522,6 +522,65 @@ function renderTransfers() {
     tables.transfersBody.innerHTML = rowsHtml;
 }
 
+// Add this entire function to your dashboard.js file
+forms.transaction.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    console.log("Step 1: 'Save Transaction' button clicked.");
+
+    const editingId = this.dataset.editingId;
+
+    // Gather data from the form's input fields
+    const inPayments = Array.from(document.querySelectorAll('#transInContainer .split-payment-row')).map(row => ({
+        amount: parseFloat(row.querySelector('.transInAmount').value) || 0,
+        type: row.querySelector('.transInType').value
+    })).filter(p => p.amount > 0);
+
+    const outPayments = Array.from(document.querySelectorAll('#transOutContainer .split-payment-row')).map(row => ({
+        amount: parseFloat(row.querySelector('.transOutAmount').value) || 0,
+        type: row.querySelector('.transOutType').value
+    })).filter(p => p.amount > 0);
+
+    const txData = {
+        date: document.getElementById('transDate').value,
+        name: document.getElementById('transName').value,
+        phone: document.getElementById('transPhone').value,
+        description: document.getElementById('transDesc').value,
+        status: document.getElementById('transStatus').value,
+        notes: document.getElementById('transNotes').value,
+        in_payments: inPayments,
+        out_payments: outPayments
+    };
+
+    console.log("Step 2: Data gathered from form:", txData);
+
+    if (editingId) {
+        txData.id = editingId;
+    }
+
+    try {
+        console.log("Step 3: Sending data to the server...");
+        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: txData });
+        console.log("Step 4: Server responded successfully! Saved data:", savedTx);
+
+        // Update the local data array
+        if (editingId) {
+            const index = transactions.findIndex(t => t.id === editingId);
+            if (index !== -1) transactions[index] = savedTx;
+        } else {
+            transactions.unshift(savedTx);
+        }
+
+        renderTransactions();
+        makeStatements();
+        modals.transaction.style.display = 'none';
+        console.log("Step 5: UI updated successfully.");
+
+    } catch (error) {
+        console.error("Step 6: ERROR! The save operation failed.", error);
+        alert('Failed to save transaction. Please check the console for a detailed red error message.');
+    }
+});
+
 function resetTransactionForm() {
     const form = forms.transaction;
     if (!form) return;
