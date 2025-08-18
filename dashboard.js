@@ -760,100 +760,56 @@ buttons.deleteTransaction.addEventListener('click', async function () {
 
 
 function showReceipt(type, data) {
-    if (type !== 'transaction' && type !== 'expense') return;
-
-    // Populate Client Info
-    document.getElementById('receiptClientName').textContent = data.name || data.category || 'N/A';
-    document.getElementById('receiptClientPhone').textContent = data.phone || 'N/A';
-
-    // Populate Date & No.
-    document.getElementById('receiptDate').textContent = new Date(data.date).toLocaleDateString();
-    document.getElementById('receiptNo').textContent = (data.id ? data.id.slice(0, 8) : 'DW-' + (Math.floor(Math.random() * 9000) + 1000));
-
-    const itemsBody = document.getElementById('receiptItemsBody');
-    itemsBody.innerHTML = ''; // Clear previous items
-
+    // Fill business info (static or from data)
+    document.getElementById('proBizAddress').textContent = 'Near AIPS Computer Institute Swaroop nagar';
+    document.getElementById('proBizEmail').textContent = 'support@digitalworld.com';
+    document.getElementById('proBizState').textContent = '07-Delhi';
+    // Fill client info
+    document.getElementById('proClientName').textContent = data.name || data.category || 'N/A';
+    document.getElementById('proClientPhone').textContent = data.phone || 'N/A';
+    // Fill receipt details
+    const dateObj = new Date(data.date);
+    document.getElementById('proReceiptNo').textContent = (data.id ? data.id.slice(0, 8) : 'DW-' + (Math.floor(Math.random() * 9000) + 1000));
+    document.getElementById('proReceiptDate').textContent = dateObj.toLocaleDateString();
+    document.getElementById('proReceiptTime').textContent = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Fill items table
+    let itemsHtml = '';
     let totalAmount = 0;
     let itemNumber = 1;
-
     if (type === 'transaction') {
         if (data.in_payments && data.in_payments.length > 0) {
             const amount = data.in_payments.reduce((sum, p) => sum + (p.amount || 0), 0);
             totalAmount += amount;
-            const row = `
-                <tr>
-                    <td>${itemNumber++}</td>
-                    <td>${data.description || 'General Transaction'}</td>
-                    <td>₹${amount.toFixed(2)}</td>
-                </tr>`;
-            itemsBody.innerHTML += row;
+            itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.description || 'General Transaction'}</td><td>-</td><td>1</td><td>₹${amount.toFixed(2)}</td><td>₹${amount.toFixed(2)}</td></tr>`;
         }
     } else if (type === 'expense') {
         totalAmount = data.amount || 0;
-        const row = `
-            <tr>
-                <td>${itemNumber++}</td>
-                <td>${data.category}: ${data.item}</td>
-                <td>₹${totalAmount.toFixed(2)}</td>
-            </tr>`;
-        itemsBody.innerHTML = row;
+        itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.category}: ${data.item}</td><td>-</td><td>1</td><td>₹${totalAmount.toFixed(2)}</td><td>₹${totalAmount.toFixed(2)}</td></tr>`;
     }
-
-    // Add this code to your dashboard.js to make the print button work
-// Update the printReceipt button logic to include CSS in the print window
-buttons.printReceipt.addEventListener('click', () => {
-    const receiptBody = document.querySelector('.receipt-body-v2');
-    if (receiptBody) {
-        const printWindow = window.open('', '', 'height=800,width=800');
-        printWindow.document.write('<html><head><title>Print Receipt</title>');
-        // Add the dashboard.css stylesheet link for print styling
-        printWindow.document.write('<link rel="stylesheet" href="dashboard.css" type="text/css" />');
-        printWindow.document.write('</head><body>');
-        printWindow.document.write('<div class="receipt-container-v2">');
-        printWindow.document.write(receiptBody.innerHTML);
-        printWindow.document.write('</div>');
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.onload = function () {
-            printWindow.focus();
-            printWindow.print();
-        };
-    }
-});
-function handlePrintReceipt() {
-    const receiptContent = document.querySelector("#receiptModal .receipt-body-v2");
-    if (!receiptContent) {
-        console.error('Receipt content not found!');
-        return;
-    }
-
-    const printWindow = window.open('', '', 'height=800,width=800');
-
-    // Copy all style rules from the main page to the new window
-    document.querySelectorAll('link[rel="stylesheet"], style').forEach(node => {
-        printWindow.document.head.appendChild(node.cloneNode(true));
-    });
-
-    printWindow.document.body.innerHTML = receiptContent.innerHTML;
-
-    // Use the 'afterprint' event to close the window, which is more reliable
-    printWindow.addEventListener('afterprint', () => {
-        printWindow.close();
-    });
-
-    // Wait for the content to fully load before printing
-    printWindow.onload = () => {
-        printWindow.focus(); // Required for some browsers
-        printWindow.print();
-    };
+    document.getElementById('proReceiptItemsBody').innerHTML = itemsHtml;
+    document.getElementById('proReceiptTotal').textContent = '₹' + totalAmount.toFixed(2);
+    document.getElementById('proReceiptSubTotal').textContent = '₹' + totalAmount.toFixed(2);
+    document.getElementById('proReceiptGrandTotal').textContent = '₹' + totalAmount.toFixed(2);
+    document.getElementById('proReceiptAmountWords').textContent = numberToWords(Math.round(totalAmount));
+    // Payment mode (placeholder if not available)
+    document.getElementById('proReceiptPaymentMode').textContent = data.payment_type || (data.in_payments && data.in_payments[0]?.type) || 'Cash';
+    // Terms (static)
+    document.getElementById('proReceiptTerms').textContent = 'Thank you for doing business with us.';
+    // Show modal
+    document.getElementById('receiptModal').style.display = 'flex';
 }
 
-    // Populate Totals
-    document.getElementById('receiptSubTotal').textContent = `₹${totalAmount.toFixed(2)}`;
-    document.getElementById('receiptTaxes').textContent = `₹0.00`; // Tax not in data
-    document.getElementById('receiptGrandTotal').textContent = `₹${totalAmount.toFixed(2)}`;
-
-    showModal('receipt'); // Changed from 'receiptModal' to 'receipt'
+function numberToWords(num) {
+    // Simple number to words for rupees (up to 99999)
+    const a = [ '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen' ];
+    const b = [ '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety' ];
+    if ((num = num.toString()).length > 5) return 'Amount too large';
+    let n = ('00000' + num).substr(-5).match(/^(\d{2})(\d{3})$/);
+    if (!n) return '';
+    let str = '';
+    str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + ' Thousand ' : '';
+    str += (n[2] != 0) ? ((str != '') ? ' ' : '') + (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) : '';
+    return str.trim() + ' Rupees only';
 }
 
 // Add this function to handle all button clicks in the table

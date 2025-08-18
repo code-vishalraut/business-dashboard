@@ -275,67 +275,76 @@
             </div>
         </div>
 
+        <!-- Replace the old receipt modal with a new professional table-based receipt -->
         <div class="modal" id="receiptModal">
             <div class="receipt-container-v2">
-                <div class="receipt-body-v2">
-                    <div class="receipt-header-v2">
-                        <div class="receipt-logo-v2">
-                            <img src="pf.JPG" alt="Business Logo">
-                        </div>
-                        <div class="receipt-store-details-v2">
-                            <h2>Digital World</h2>
-                            <p>Phone: 7547034664</p>
-                            <p>Email: support@digitalworld.com</p>
-                            <p>Web: www.digitalworld.com</p>
-                        </div>
-                    </div>
-                    <div class="receipt-title-v2">
-                        <span>RECEIPT</span>
-                    </div>
-        
-                    <div class="receipt-client-info-v2">
-                        <div class="client-details">
-                            <p><strong>Client Information:</strong></p>
-                            <p>Name: <span id="receiptClientName"></span></p>
-                            <p>Address: <span id="receiptClientAddress">N/A</span></p>
-                            <p>Phone: <span id="receiptClientPhone"></span></p>
-                        </div>
-                        <div class="receipt-date-info">
-                            <p>Date: <span id="receiptDate"></span></p>
-                            <p>No.: <span id="receiptNo"></span></p>
-                        </div>
-                    </div>
-        
-                    <table class="receipt-items-table-v2">
+                <div class="receipt-body-v2 pro-receipt">
+                    <h2 class="pro-receipt-title">Receipt</h2>
+                    <table class="pro-receipt-header-table">
+                        <tr>
+                            <td rowspan="2" class="pro-receipt-logo-cell">
+                                <img src="pf.JPG" alt="Business Logo" class="pro-receipt-logo">
+                            </td>
+                            <td class="pro-receipt-bizinfo">
+                                <div class="pro-biz-name">Digital World</div>
+                                <div id="proBizAddress">Near AIPS Computer Institute Swaroop nagar</div>
+                                <div>Phone: <b>7547034664</b></div>
+                                <div>Email: <span id="proBizEmail">support@digitalworld.com</span></div>
+                                <div>State: <span id="proBizState">07-Delhi</span></div>
+                            </td>
+                            <td class="pro-receipt-extra">
+                                <div>Receipt No: <span id="proReceiptNo"></span></div>
+                                <div>Date: <span id="proReceiptDate"></span></div>
+                                <div>Time: <span id="proReceiptTime"></span></div>
+                            </td>
+                        </tr>
+                    </table>
+                    <table class="pro-receipt-client-table">
+                        <tr>
+                            <td>
+                                <div>Bill To:</div>
+                                <div id="proClientName"></div>
+                                <div>Contact No: <span id="proClientPhone"></span></div>
+                            </td>
+                        </tr>
+                    </table>
+                    <table class="pro-receipt-items-table">
                         <thead>
                             <tr>
-                                <th>No.</th>
-                                <th>Item Description</th>
-                                <th>Amount</th>
+                                <th>#</th>
+                                <th>Item Name</th>
+                                <th>HSN/ SAC</th>
+                                <th>Quantity</th>
+                                <th>Price/ Unit (₹)</th>
+                                <th>Amount(₹)</th>
                             </tr>
                         </thead>
-                        <tbody id="receiptItemsBody">
-                        </tbody>
+                        <tbody id="proReceiptItemsBody"></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5" style="text-align:right;font-weight:bold;">Total</td>
+                                <td id="proReceiptTotal"></td>
+                            </tr>
+                        </tfoot>
                     </table>
-        
-                    <div class="receipt-totals-v2">
-                        <div class="total-row">
-                            <span class="total-label">Sub Total</span>
-                            <span class="total-value" id="receiptSubTotal"></span>
-                        </div>
-                        <div class="total-row">
-                            <span class="total-label">Taxes Total</span>
-                            <span class="total-value" id="receiptTaxes"></span>
-                        </div>
-                        <div class="total-row grand-total">
-                            <span class="total-label">Total</span>
-                            <span class="total-value" id="receiptGrandTotal"></span>
-                        </div>
+                    <div class="pro-receipt-summary">
+                        <div>Sub Total : <span id="proReceiptSubTotal"></span></div>
+                        <div>Total : <span id="proReceiptGrandTotal"></span></div>
+                        <div>Invoice Amount In Words : <span id="proReceiptAmountWords"></span></div>
                     </div>
-        
-                    <div class="receipt-footer-v2">
-                        <p>Goods/Payment once received cannot be returned.</p>
-                        <p>Thank you for your business!</p>
+                    <div class="pro-receipt-payment-mode">
+                        Payment Mode: <span id="proReceiptPaymentMode"></span>
+                    </div>
+                    <div class="pro-receipt-terms">
+                        Terms And Conditions:<br>
+                        <span id="proReceiptTerms">Thank you for doing business with us.</span>
+                    </div>
+                    <div class="pro-receipt-signature">
+                        <div style="float:right;text-align:center;">
+                            <br><br>
+                            For Digital World:<br><br><br>
+                            <span style="display:inline-block;min-width:120px;border-top:1px solid #333;">Authorized Signatory</span>
+                        </div>
                     </div>
                 </div>
                 <div class="receipt-actions">
@@ -343,7 +352,7 @@
                     <button id="closeReceiptBtn" class="close-btn"><i class="fas fa-times"></i> Close</button>
                 </div>
             </div>
-        </div>>
+        </div>
 
         <!-- Expense Modal -->
         <div class="modal" id="expenseFormModal">
