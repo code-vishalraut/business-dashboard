@@ -800,25 +800,24 @@ function showReceipt(type, data) {
     }
 
     // Add this code to your dashboard.js to make the print button work
+// Update the printReceipt button logic to include CSS in the print window
 buttons.printReceipt.addEventListener('click', () => {
     const receiptBody = document.querySelector('.receipt-body-v2');
     if (receiptBody) {
-        // Create a new window to print just the receipt
         const printWindow = window.open('', '', 'height=800,width=800');
         printWindow.document.write('<html><head><title>Print Receipt</title>');
-        // Optional: Add some basic print styling
-        printWindow.document.write(`
-            <style>
-                body { font-family: Arial, sans-serif; }
-                .receipt-container-v2 { max-width: 600px; margin: auto; }
-                /* You can copy more styles from your CSS file here if needed */
-            </style>
-        `);
+        // Add the dashboard.css stylesheet link for print styling
+        printWindow.document.write('<link rel="stylesheet" href="dashboard.css" type="text/css" />');
         printWindow.document.write('</head><body>');
+        printWindow.document.write('<div class="receipt-container-v2">');
         printWindow.document.write(receiptBody.innerHTML);
+        printWindow.document.write('</div>');
         printWindow.document.write('</body></html>');
         printWindow.document.close();
-        printWindow.print();
+        printWindow.onload = function () {
+            printWindow.focus();
+            printWindow.print();
+        };
     }
 });
 function handlePrintReceipt() {
