@@ -1252,3 +1252,53 @@ footer {
 footer p {
     margin: 0;
 }
+
+@media print {
+  body, html {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .modal, .modal.active, .receipt-container-v2, .pro-receipt {
+    position: static !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 800px !important;
+    min-width: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  .receipt-body-v2, .pro-receipt {
+    padding: 24px !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .receipt-actions, .close-btn {
+    display: none !important;
+  }
+  /* Hide everything except the receipt */
+  body * {
+    visibility: hidden !important;
+  }
+  #receiptModal, #receiptModal * {
+    visibility: visible !important;
+  }
+  #receiptModal {
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    z-index: 99999 !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
