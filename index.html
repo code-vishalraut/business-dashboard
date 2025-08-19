@@ -411,11 +411,13 @@
                     <label>Item</label>
                     <input type="text" id="expenseItem" required>
                     <label>Amount (₹)</label>
-                    <input type="number" id="expenseAmount" min="0" step="0.01" required>
-                    <label>Payment Mode</label>
-                    <select id="expensePaymentType" required>
-                        <!-- Will be filled by JS -->
-                    </select>
+                    <div id="expensePayContainer" class="split-payment-container">
+                        <div class="split-payment-row">
+                            <input type="number" class="expenseAmount" min="0" step="0.01" value="0" placeholder="Amount">
+                            <select class="expensePaymentType"></select>
+                            <button type="button" class="add-split-btn" data-target="expensePayContainer"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
                     <button type="submit">💾 Save Expense</button>
                 </form>
             </div>
@@ -434,11 +436,13 @@
                     <label>Phone</label>
                     <input type="tel" id="debtorPhone">
                     <label>Amount (₹)</label>
-                    <input type="number" id="debtorAmount" min="0" step="0.01" required>
-                    <label>Payment Type</label>
-                    <select id="debtorPaymentType" required>
-                        <!-- Will be filled by JS -->
-                    </select>
+                    <div id="debtorPayContainer" class="split-payment-container">
+                        <div class="split-payment-row">
+                            <input type="number" class="debtorAmount" min="0" step="0.01" value="0" placeholder="Amount">
+                            <select class="debtorPaymentType"></select>
+                            <button type="button" class="add-split-btn" data-target="debtorPayContainer"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
                     <label>Description</label>
                     <input type="text" id="debtorDesc">
                     <button type="submit">💾 Save</button>
@@ -459,11 +463,13 @@
                     <label>Phone</label>
                     <input type="tel" id="creditorPhone">
                     <label>Amount (₹)</label>
-                    <input type="number" id="creditorAmount" min="0" step="0.01" required>
-                    <label>Payment Type</label>
-                    <select id="creditorPaymentType" required>
-                        <!-- Will be filled by JS -->
-                    </select>
+                    <div id="creditorPayContainer" class="split-payment-container">
+                        <div class="split-payment-row">
+                            <input type="number" class="creditorAmount" min="0" step="0.01" value="0" placeholder="Amount">
+                            <select class="creditorPaymentType"></select>
+                            <button type="button" class="add-split-btn" data-target="creditorPayContainer"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
                     <label>Description</label>
                     <input type="text" id="creditorDesc">
                     <button type="submit">💾 Save</button>

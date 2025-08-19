@@ -178,7 +178,9 @@ buttons.quickAddTransfer && buttons.quickAddTransfer.addEventListener('click', (
 function updatePaymentTypeOptions() {
     const bankOpts = banks.filter(b => b !== 'Cash' && b !== 'Bank (Generic)').map(b => `<option value="${b}">${b}</option>`).join('');
     const allOpts = `<option value="Cash">Cash</option>${bankOpts}`;
-    document.querySelectorAll('.transInType, .transOutType, #expensePaymentType, #debtorPaymentType, #creditorPaymentType, #transferFrom, #transferTo, #settlePaymentType').forEach(select => select.innerHTML = allOpts);
+    document.querySelectorAll('.transInType, .transOutType, .expensePaymentType, .debtorPaymentType, .creditorPaymentType, #transferFrom, #transferTo, #settlePaymentType').forEach(select => {
+        if (select) select.innerHTML = allOpts;
+    });
 }
 
 // --- Split Payment Row ---
@@ -253,12 +255,18 @@ function renderTransactions() {
 if (forms.expense) {
     forms.expense.addEventListener('submit', async function (e) {
         e.preventDefault();
+        const split = Array.from(document.querySelectorAll('#expensePayContainer .split-payment-row')).map(r => ({
+            amount: parseFloat(r.querySelector('.expenseAmount').value) || 0,
+            type: r.querySelector('.expensePaymentType').value
+        })).filter(p => p.amount > 0);
+        const total = split.reduce((s, p) => s + p.amount, 0);
         const ex = {
             date: document.getElementById('expenseDate').value,
             category: document.getElementById('expenseCategory').value,
             item: document.getElementById('expenseItem').value,
-            amount: parseFloat(document.getElementById('expenseAmount').value) || 0,
-            payment_type: document.getElementById('expensePaymentType').value
+            amount: total,
+            payment_type: split.map(p => p.type).join(', '),
+            split_payments: split
         };
         // ADDED: Use apiCall to save expense to Supabase
         await apiCall('addOrUpdate', { table: 'expenses', data: ex });
@@ -275,12 +283,18 @@ if (forms.expense) {
 if (forms.debtor) {
     forms.debtor.addEventListener('submit', async function (e) {
         e.preventDefault();
+        const split = Array.from(document.querySelectorAll('#debtorPayContainer .split-payment-row')).map(r => ({
+            amount: parseFloat(r.querySelector('.debtorAmount').value) || 0,
+            type: r.querySelector('.debtorPaymentType').value
+        })).filter(p => p.amount > 0);
+        const total = split.reduce((s, p) => s + p.amount, 0);
         const d = {
             date: document.getElementById('debtorDate').value,
             name: document.getElementById('debtorName').value,
             phone: document.getElementById('debtorPhone').value,
-            amount: parseFloat(document.getElementById('debtorAmount').value) || 0,
-            payment_type: document.getElementById('debtorPaymentType').value,
+            amount: total,
+            payment_type: split.map(p => p.type).join(', '),
+            split_payments: split,
             description: document.getElementById('debtorDesc').value,
             status: 'Pending'
         };
@@ -302,12 +316,18 @@ if (forms.debtor) {
 if (forms.creditor) {
     forms.creditor.addEventListener('submit', async function (e) {
         e.preventDefault();
+        const split = Array.from(document.querySelectorAll('#creditorPayContainer .split-payment-row')).map(r => ({
+            amount: parseFloat(r.querySelector('.creditorAmount').value) || 0,
+            type: r.querySelector('.creditorPaymentType').value
+        })).filter(p => p.amount > 0);
+        const total = split.reduce((s, p) => s + p.amount, 0);
         const c = {
             date: document.getElementById('creditorDate').value,
             name: document.getElementById('creditorName').value,
             phone: document.getElementById('creditorPhone').value,
-            amount: parseFloat(document.getElementById('creditorAmount').value) || 0,
-            payment_type: document.getElementById('creditorPaymentType').value,
+            amount: total,
+            payment_type: split.map(p => p.type).join(', '),
+            split_payments: split,
             description: document.getElementById('creditorDesc').value,
             status: 'Pending'
         };
@@ -466,10 +486,17 @@ function updateBankPieChart() {
         });
     });
 
-    // Subtract expenses paid from banks
+    // Subtract expenses paid from banks (supports split payments)
     expenses.forEach(ex => {
-        if (ex.payment_type !== 'Cash') {
-            bankBalances[ex.payment_type] = (bankBalances[ex.payment_type] || 0) - Number(ex.amount);
+        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
+        if (splits && splits.length) {
+            splits.forEach(p => {
+                if ((p.type || '').toLowerCase() !== 'cash') {
+                    bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount || 0);
+                }
+            });
+        } else if ((ex.payment_type || '').toLowerCase() !== 'cash') {
+            bankBalances[ex.payment_type] = (bankBalances[ex.payment_type] || 0) - Number(ex.amount || 0);
         }
     });
 
@@ -927,6 +954,45 @@ function createSplitRow(direction) {
     return wrapper;
 }
 
+// Generic handler to add new split rows for other forms
+document.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('.add-split-btn');
+    if (!addBtn) return;
+    const targetId = addBtn.getAttribute('data-target');
+    const container = document.getElementById(targetId);
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'split-payment-row';
+    const amountInput = document.createElement('input');
+    amountInput.type = 'number';
+    amountInput.min = '0';
+    amountInput.step = '0.01';
+    amountInput.value = '0';
+    amountInput.placeholder = 'Amount';
+    // Choose classes based on container
+    if (targetId === 'expensePayContainer') amountInput.className = 'expenseAmount';
+    if (targetId === 'debtorPayContainer') amountInput.className = 'debtorAmount';
+    if (targetId === 'creditorPayContainer') amountInput.className = 'creditorAmount';
+
+    const typeSelect = document.createElement('select');
+    if (targetId === 'expensePayContainer') typeSelect.className = 'expensePaymentType';
+    if (targetId === 'debtorPayContainer') typeSelect.className = 'debtorPaymentType';
+    if (targetId === 'creditorPayContainer') typeSelect.className = 'creditorPaymentType';
+    const bankOpts = banks.filter(b => b !== 'Cash' && b !== 'Bank (Generic)').map(b => `<option value="${b}">${b}</option>`).join('');
+    typeSelect.innerHTML = `<option value="Cash">Cash</option>${bankOpts}`;
+
+    const addButton = document.createElement('button');
+    addButton.type = 'button';
+    addButton.className = 'add-split-btn';
+    addButton.setAttribute('data-target', targetId);
+    addButton.innerHTML = '<i class="fas fa-plus"></i>';
+
+    row.appendChild(amountInput);
+    row.appendChild(typeSelect);
+    row.appendChild(addButton);
+    container.appendChild(row);
+});
+
 function setupSplitPaymentButtons() {
     ensureDefaultSplitRows();
 }
@@ -972,13 +1038,26 @@ function makeStatements() {
 
     // Standalone expenses
     (expenses || []).forEach(ex => {
-        const amount = Number(ex.amount) || 0;
-        totalExpenses += amount;
-        const pType = (ex.payment_type || '').toLowerCase();
-        if (pType === 'cash') {
-            cashBalance -= amount;
-        } else if (ex.payment_type) {
-            bankNameToBalance[ex.payment_type] = (bankNameToBalance[ex.payment_type] || 0) - amount;
+        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
+        if (splits && splits.length) {
+            splits.forEach(p => {
+                const amount = Number(p.amount) || 0;
+                totalExpenses += amount;
+                if ((p.type || '').toLowerCase() === 'cash') {
+                    cashBalance -= amount;
+                } else if (p.type) {
+                    bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) - amount;
+                }
+            });
+        } else {
+            const amount = Number(ex.amount) || 0;
+            totalExpenses += amount;
+            const pType = (ex.payment_type || '').toLowerCase();
+            if (pType === 'cash') {
+                cashBalance -= amount;
+            } else if (ex.payment_type) {
+                bankNameToBalance[ex.payment_type] = (bankNameToBalance[ex.payment_type] || 0) - amount;
+            }
         }
     });
 
@@ -1043,11 +1122,25 @@ function makeStatements() {
     // Process Debtors (Loan Given -> Money OUT)
     (debtors || []).forEach(d => {
         if (d.status !== 'Settled') {
-            const amount = Number(d.amount) || 0;
-            if ((d.payment_type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
-            } else if (d.payment_type && bankNameToBalance[d.payment_type]) {
-                bankStatements[d.payment_type].push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+            const splits = Array.isArray(d.split_payments) ? d.split_payments : null;
+            if (splits && splits.length) {
+                splits.forEach(p => {
+                    const amount = Number(p.amount) || 0;
+                    if ((p.type || '').toLowerCase() === 'cash') {
+                        cashStatements.push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+                    } else {
+                        if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                        bankStatements[p.type].push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+                    }
+                });
+            } else {
+                const amount = Number(d.amount) || 0;
+                if ((d.payment_type || '').toLowerCase() === 'cash') {
+                    cashStatements.push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+                } else if (d.payment_type) {
+                    if (!bankStatements[d.payment_type]) bankStatements[d.payment_type] = [];
+                    bankStatements[d.payment_type].push({ date: d.date, description: `Loan to ${d.name}`, in: 0, out: amount });
+                }
             }
         }
     });
@@ -1055,11 +1148,25 @@ function makeStatements() {
     // Process Creditors (Loan Taken -> Money IN)
     (creditors || []).forEach(c => {
         if (c.status !== 'Settled') {
-            const amount = Number(c.amount) || 0;
-            if ((c.payment_type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
-            } else if (c.payment_type && bankNameToBalance[c.payment_type]) {
-                bankStatements[c.payment_type].push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+            const splits = Array.isArray(c.split_payments) ? c.split_payments : null;
+            if (splits && splits.length) {
+                splits.forEach(p => {
+                    const amount = Number(p.amount) || 0;
+                    if ((p.type || '').toLowerCase() === 'cash') {
+                        cashStatements.push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+                    } else {
+                        if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                        bankStatements[p.type].push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+                    }
+                });
+            } else {
+                const amount = Number(c.amount) || 0;
+                if ((c.payment_type || '').toLowerCase() === 'cash') {
+                    cashStatements.push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+                } else if (c.payment_type) {
+                    if (!bankStatements[c.payment_type]) bankStatements[c.payment_type] = [];
+                    bankStatements[c.payment_type].push({ date: c.date, description: `Loan from ${c.name}`, in: amount, out: 0 });
+                }
             }
         }
     });
@@ -1105,10 +1212,21 @@ function makeStatements() {
         });
     });
     (expenses || []).forEach(ex => {
-        const amount = Number(ex.amount) || 0;
-        if (ex.payment_type && (ex.payment_type || '').toLowerCase() !== 'cash') {
-            if (!bankStatements[ex.payment_type]) bankStatements[ex.payment_type] = [];
-            bankStatements[ex.payment_type].push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: amount });
+        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
+        if (splits && splits.length) {
+            splits.forEach(p => {
+                const amount = Number(p.amount) || 0;
+                if ((p.type || '').toLowerCase() !== 'cash') {
+                    if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                    bankStatements[p.type].push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: amount });
+                }
+            });
+        } else {
+            const amount = Number(ex.amount) || 0;
+            if (ex.payment_type && (ex.payment_type || '').toLowerCase() !== 'cash') {
+                if (!bankStatements[ex.payment_type]) bankStatements[ex.payment_type] = [];
+                bankStatements[ex.payment_type].push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: amount });
+            }
         }
     });
     (transfers || []).forEach(tr => {
