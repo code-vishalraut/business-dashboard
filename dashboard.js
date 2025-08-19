@@ -669,6 +669,11 @@ forms.transaction.addEventListener('submit', async function (e) {
     const editingId = this.dataset.editingId;
 
     // Gather data from the form's input fields
+    const items = Array.from(document.querySelectorAll('#txItemsContainer .tx-item-row')).map(r => ({
+        name: (r.querySelector('.txItemName')?.value || '').trim(),
+        qty: parseInt(r.querySelector('.txItemQty')?.value || '1', 10) || 1,
+        price: parseFloat(r.querySelector('.txItemPrice')?.value || '0') || 0
+    })).filter(it => it.name && it.qty > 0);
     const inPayments = Array.from(document.querySelectorAll('#transInContainer .split-payment-row')).map(row => ({
         amount: parseFloat(row.querySelector('.transInAmount').value) || 0,
         type: row.querySelector('.transInType').value
@@ -686,6 +691,7 @@ forms.transaction.addEventListener('submit', async function (e) {
         description: document.getElementById('transDesc').value,
         status: document.getElementById('transStatus').value,
         notes: document.getElementById('transNotes').value,
+        items: items,
         in_payments: inPayments,
         out_payments: outPayments
     };
@@ -815,11 +821,18 @@ function showReceipt(type, data) {
     if (type === 'transaction') {
         const amount = (data.in_payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
         totalAmount += amount;
-        itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.description || 'Transaction'}</td><td>₹${amount.toFixed(2)}</td></tr>`;
+        if (Array.isArray(data.items) && data.items.length) {
+            data.items.forEach((it, idx) => {
+                const line = (Number(it.qty) || 1) * (Number(it.price) || 0);
+                itemsHtml += `<tr><td>${idx + 1}</td><td>${it.name || ''}</td><td>${it.qty || 1}</td><td>₹${(Number(it.price) || 0).toFixed(2)}</td><td>₹${line.toFixed(2)}</td></tr>`;
+            });
+        } else {
+            itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.description || 'Transaction'}</td><td>1</td><td>₹${amount.toFixed(2)}</td><td>₹${amount.toFixed(2)}</td></tr>`;
+        }
     } else if (type === 'expense') {
         const amount = Number(data.amount) || 0;
         totalAmount += amount;
-        itemsHtml += `<tr><td>${itemNumber++}</td><td>${(data.category || 'Expense') + (data.item ? ': ' + data.item : '')}</td><td>₹${amount.toFixed(2)}</td></tr>`;
+        itemsHtml += `<tr><td>${itemNumber++}</td><td>${(data.category || 'Expense') + (data.item ? ': ' + data.item : '')}</td><td>1</td><td>₹${amount.toFixed(2)}</td><td>₹${amount.toFixed(2)}</td></tr>`;
     }
 
     const itemsBody = document.getElementById('receiptItemsBody');
@@ -961,6 +974,18 @@ document.addEventListener('click', (e) => {
     const targetId = addBtn.getAttribute('data-target');
     const container = document.getElementById(targetId);
     if (!container) return;
+    if (targetId === 'txItemsContainer') {
+        const row = document.createElement('div');
+        row.className = 'tx-item-row';
+        row.innerHTML = `
+            <input type="text" class="txItemName" placeholder="Item / Service">
+            <input type="number" class="txItemQty" min="1" step="1" value="1" placeholder="Qty">
+            <input type="number" class="txItemPrice" min="0" step="0.01" value="0" placeholder="Price (₹)">
+            <button type="button" class="add-split-btn" data-target="txItemsContainer"><i class="fas fa-plus"></i></button>
+        `;
+        container.appendChild(row);
+        return;
+    }
     const row = document.createElement('div');
     row.className = 'split-payment-row';
     const amountInput = document.createElement('input');

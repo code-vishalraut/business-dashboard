@@ -402,6 +402,23 @@ header h1 {
     font-size: 0.9rem;
 }
 
+/* === Billed Items (Transaction) === */
+.items-container {
+    border: 1px solid #eee;
+    padding: 1rem;
+    border-radius: 8px;
+    background: #f9f9f9;
+}
+.tx-item-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.tx-item-row .txItemName { flex: 3; }
+.tx-item-row .txItemQty { flex: 1; }
+.tx-item-row .txItemPrice { flex: 2; }
+
 /* === BANK MANAGEMENT IN ACCOUNTS TAB === */
 .account-header {
     display: flex;
