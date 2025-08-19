@@ -1292,3 +1292,15 @@ if (printBtn) {
     }
 });
 */
+
+// === AI Assistant Minimize/Maximize ===
+function toggleAIChat() {
+    const aiBox = document.getElementById('aiAssistant');
+    if (!aiBox) return;
+    aiBox.classList.toggle('minimized');
+    // Change icon
+    const icon = document.getElementById('aiToggleIcon');
+    if (icon) {
+        icon.textContent = aiBox.classList.contains('minimized') ? '+' : '−';
+    }
+}
