@@ -1,4 +1,4 @@
-// /api/proxy.js (Final Corrected Version)
+// /api/proxy.js (Final Corrected Version with clearAllData)
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
@@ -13,15 +13,12 @@ export default async function handler(req, res) {
         const supabase = createClient(
             process.env.SUPABASE_URL,
             process.env.SUPABASE_SERVICE_KEY,
-            // --- THIS IS THE FIX ---
-            // These options tell the Supabase client how to behave in a serverless environment
             {
                 auth: {
                     autoRefreshToken: false,
                     persistSession: false
                 }
             }
-            // --- END OF FIX ---
         );
 
         // Get the user's token from the Authorization header
@@ -83,6 +80,13 @@ export default async function handler(req, res) {
                     .eq('user_id', userId)
                     .eq('id', payload.id));
                 break;
+            
+            // --- NEW CODE ADDED HERE ---
+            case 'clearAllData':
+                // This calls the SQL function you created in Supabase
+                ({ data, error } = await supabase.rpc('clear_all_user_data'));
+                break;
+            // --- END OF NEW CODE ---
 
             default:
                 return res.status(400).json({ error: 'Invalid action' });
