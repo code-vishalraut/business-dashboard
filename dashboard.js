@@ -975,7 +975,7 @@ function setupEventListeners() {
         const editBtn = e.target.closest('.edit-btn');
         if (editBtn) {
             const txId = editBtn.dataset.id;
-            if txId) {
+            if (txId) {
                 editTransaction(txId);
             }
         }
