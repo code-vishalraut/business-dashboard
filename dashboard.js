@@ -760,43 +760,51 @@ buttons.deleteTransaction.addEventListener('click', async function () {
 
 
 function showReceipt(type, data) {
-    // Fill business info (static or from data)
-    document.getElementById('proBizAddress').textContent = 'Near AIPS Computer Institute Swaroop nagar';
-    document.getElementById('proBizEmail').textContent = 'support@digitalworld.com';
-    document.getElementById('proBizState').textContent = '07-Delhi';
-    // Fill client info
-    document.getElementById('proClientName').textContent = data.name || data.category || 'N/A';
-    document.getElementById('proClientPhone').textContent = data.phone || 'N/A';
-    // Fill receipt details
-    const dateObj = new Date(data.date);
-    document.getElementById('proReceiptNo').textContent = (data.id ? data.id.slice(0, 8) : 'DW-' + (Math.floor(Math.random() * 9000) + 1000));
-    document.getElementById('proReceiptDate').textContent = dateObj.toLocaleDateString();
-    document.getElementById('proReceiptTime').textContent = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    // Fill items table
+    // Guard against missing data
+    if (!data) return;
+
+    // Map to new V2 receipt IDs present in index.html
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value ?? '';
+    };
+
+    // Client info
+    setText('receiptClientName', data.name || data.category || 'N/A');
+    setText('receiptClientAddress', data.address || '');
+    setText('receiptClientPhone', data.phone || '');
+
+    // Receipt meta
+    const dateObj = data.date ? new Date(data.date) : new Date();
+    setText('receiptDate', dateObj.toLocaleString());
+    setText('receiptNo', (data.id ? String(data.id).slice(0, 8) : 'DW-' + (Math.floor(Math.random() * 9000) + 1000)));
+
+    // Items and totals
     let itemsHtml = '';
     let totalAmount = 0;
     let itemNumber = 1;
+
     if (type === 'transaction') {
-        if (data.in_payments && data.in_payments.length > 0) {
-            const amount = data.in_payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-            totalAmount += amount;
-            itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.description || 'General Transaction'}</td><td>-</td><td>1</td><td>₹${amount.toFixed(2)}</td><td>₹${amount.toFixed(2)}</td></tr>`;
-        }
+        const amount = (data.in_payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        totalAmount += amount;
+        itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.description || 'Transaction'}</td><td>₹${amount.toFixed(2)}</td></tr>`;
     } else if (type === 'expense') {
-        totalAmount = data.amount || 0;
-        itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.category}: ${data.item}</td><td>-</td><td>1</td><td>₹${totalAmount.toFixed(2)}</td><td>₹${totalAmount.toFixed(2)}</td></tr>`;
+        const amount = Number(data.amount) || 0;
+        totalAmount += amount;
+        itemsHtml += `<tr><td>${itemNumber++}</td><td>${(data.category || 'Expense') + (data.item ? ': ' + data.item : '')}</td><td>₹${amount.toFixed(2)}</td></tr>`;
     }
-    document.getElementById('proReceiptItemsBody').innerHTML = itemsHtml;
-    document.getElementById('proReceiptTotal').textContent = '₹' + totalAmount.toFixed(2);
-    document.getElementById('proReceiptSubTotal').textContent = '₹' + totalAmount.toFixed(2);
-    document.getElementById('proReceiptGrandTotal').textContent = '₹' + totalAmount.toFixed(2);
-    document.getElementById('proReceiptAmountWords').textContent = numberToWords(Math.round(totalAmount));
-    // Payment mode (placeholder if not available)
-    document.getElementById('proReceiptPaymentMode').textContent = data.payment_type || (data.in_payments && data.in_payments[0]?.type) || 'Cash';
-    // Terms (static)
-    document.getElementById('proReceiptTerms').textContent = 'Thank you for doing business with us.';
-    // Show modal
-    document.getElementById('receiptModal').style.display = 'flex';
+
+    const itemsBody = document.getElementById('receiptItemsBody');
+    if (itemsBody) itemsBody.innerHTML = itemsHtml;
+
+    // Subtotal, taxes (0), total
+    setText('receiptSubTotal', `₹${totalAmount.toFixed(2)}`);
+    setText('receiptTaxes', `₹${(0).toFixed(2)}`);
+    setText('receiptGrandTotal', `₹${totalAmount.toFixed(2)}`);
+
+    // Finally show modal
+    const modal = document.getElementById('receiptModal');
+    if (modal) modal.style.display = 'flex';
 }
 
 function numberToWords(num) {
