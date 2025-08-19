@@ -793,57 +793,89 @@ buttons.deleteTransaction.addEventListener('click', async function () {
 });
 
 
+// Replace the old showReceipt function with this new one
 function showReceipt(type, data) {
     // Guard against missing data
     if (!data) return;
 
-    // Map to new V2 receipt IDs present in index.html
+    // Helper function to set text content
     const setText = (id, value) => {
         const el = document.getElementById(id);
         if (el) el.textContent = value ?? '';
     };
 
-    // Client info
+    // --- Client and Receipt Meta Info ---
     setText('receiptClientName', data.name || data.category || 'N/A');
     setText('receiptClientAddress', data.address || '');
     setText('receiptClientPhone', data.phone || '');
-
-    // Receipt meta
     const dateObj = data.date ? new Date(data.date) : new Date();
     setText('receiptDate', dateObj.toLocaleString());
     setText('receiptNo', (data.id ? String(data.id).slice(0, 8) : 'DW-' + (Math.floor(Math.random() * 9000) + 1000)));
 
-    // Items and totals
+    // --- NEW: Calculation Logic ---
     let itemsHtml = '';
-    let totalAmount = 0;
-    let itemNumber = 1;
+    let billTotal = 0;
+    let amountReceived = 0;
 
     if (type === 'transaction') {
-        const amount = (data.in_payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-        totalAmount += amount;
+        // Calculate the total bill from the items list
         if (Array.isArray(data.items) && data.items.length) {
             data.items.forEach((it, idx) => {
-                const line = (Number(it.qty) || 1) * (Number(it.price) || 0);
-                itemsHtml += `<tr><td>${idx + 1}</td><td>${it.name || ''}</td><td>${it.qty || 1}</td><td>₹${(Number(it.price) || 0).toFixed(2)}</td><td>₹${line.toFixed(2)}</td></tr>`;
+                const lineTotal = (Number(it.qty) || 1) * (Number(it.price) || 0);
+                billTotal += lineTotal;
+                // This now matches the new 5-column HTML table header
+                itemsHtml += `<tr>
+                    <td>${idx + 1}</td>
+                    <td>${it.name || ''}</td>
+                    <td>${it.qty || 1}</td>
+                    <td>₹${(Number(it.price) || 0).toFixed(2)}</td>
+                    <td>₹${lineTotal.toFixed(2)}</td>
+                </tr>`;
             });
         } else {
-            itemsHtml += `<tr><td>${itemNumber++}</td><td>${data.description || 'Transaction'}</td><td>1</td><td>₹${amount.toFixed(2)}</td><td>₹${amount.toFixed(2)}</td></tr>`;
+             // Fallback if there are no items, use the transaction description
+            const in_total = (data.in_payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            billTotal = in_total;
+             itemsHtml += `<tr>
+                <td>1</td>
+                <td>${data.description || 'Service/Product'}</td>
+                <td>1</td>
+                <td>₹${billTotal.toFixed(2)}</td>
+                <td>₹${billTotal.toFixed(2)}</td>
+             </tr>`;
         }
+
+        // Calculate the amount received from payments
+        amountReceived = (data.in_payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
     } else if (type === 'expense') {
-        const amount = Number(data.amount) || 0;
-        totalAmount += amount;
-        itemsHtml += `<tr><td>${itemNumber++}</td><td>${(data.category || 'Expense') + (data.item ? ': ' + data.item : '')}</td><td>1</td><td>₹${amount.toFixed(2)}</td><td>₹${amount.toFixed(2)}</td></tr>`;
+        billTotal = Number(data.amount) || 0;
+        amountReceived = billTotal; // For expenses, received is same as total
+        itemsHtml += `<tr>
+            <td>1</td>
+            <td>${(data.category || 'Expense') + (data.item ? ': ' + data.item : '')}</td>
+            <td>1</td>
+            <td>₹${billTotal.toFixed(2)}</td>
+            <td>₹${billTotal.toFixed(2)}</td>
+        </tr>`;
     }
 
+    const balanceDue = billTotal - amountReceived;
+
+    // --- Update UI ---
     const itemsBody = document.getElementById('receiptItemsBody');
     if (itemsBody) itemsBody.innerHTML = itemsHtml;
 
-    // Subtotal, taxes (0), total
-    setText('receiptSubTotal', `₹${totalAmount.toFixed(2)}`);
+    // Populate the totals section
+    setText('receiptSubTotal', `₹${billTotal.toFixed(2)}`);
     setText('receiptTaxes', `₹${(0).toFixed(2)}`);
-    setText('receiptGrandTotal', `₹${totalAmount.toFixed(2)}`);
+    setText('receiptGrandTotal', `₹${billTotal.toFixed(2)}`);
+    
+    // Populate the NEW fields
+    setText('receiptAmountReceived', `₹${amountReceived.toFixed(2)}`);
+    setText('receiptBalanceDue', `₹${balanceDue.toFixed(2)}`);
 
-    // Finally show modal
+    // Finally show the modal
     const modal = document.getElementById('receiptModal');
     if (modal) modal.style.display = 'flex';
 }

@@ -875,6 +875,20 @@ tr.settled-row:hover td {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
 }
+/* Add this to your dashboard.css file */
+.receipt-totals-v2 .total-row.amount-received {
+    color: var(--success); /* Green color for received amount */
+    font-weight: bold;
+    margin-top: 1rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed #ccc;
+}
+
+.receipt-totals-v2 .total-row.balance-due {
+    color: var(--danger); /* Red color for balance due */
+    font-weight: bold;
+    font-size: 1.2rem;
+}
 
 .receipt-footer-v2 {
     margin-top: 2rem;
