@@ -1200,12 +1200,13 @@ tr.settled-row:hover td {
     padding: 1rem;
     max-width: 480px;
     margin: 0 auto 2rem auto;
+    height: 400px; /* fixed container height */
 }
 
 #bankPieChart {
-    width: 100%;
+    width: 100% !important;
     max-width: 440px;
-    height: 180px;
+    height: 100% !important; /* occupy full container */
     display: block;
     margin: 0 auto;
 }

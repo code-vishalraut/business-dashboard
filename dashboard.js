@@ -366,6 +366,7 @@ function init() {
     renderTransfers();
     makeStatements();
     setupEventListeners();
+    bindReceiptControls();
     // Your original event listener setups
     // Add these lines inside the init() function
     document.getElementById('chartPeriod').addEventListener('change', updateTrendChart);
@@ -805,6 +806,25 @@ function showReceipt(type, data) {
     // Finally show modal
     const modal = document.getElementById('receiptModal');
     if (modal) modal.style.display = 'flex';
+}
+
+// Print/Close handlers for receipt
+function handlePrintReceipt() {
+    try { window.print(); } catch (e) { console.error(e); }
+}
+function handleCloseReceipt() {
+    const modal = document.getElementById('receiptModal');
+    if (modal) modal.style.display = 'none';
+}
+function bindReceiptControls() {
+    const printBtn = document.getElementById('printReceiptBtn');
+    if (printBtn) {
+        printBtn.onclick = handlePrintReceipt;
+    }
+    const closeBtn = document.getElementById('closeReceiptBtn');
+    if (closeBtn) {
+        closeBtn.onclick = handleCloseReceipt;
+    }
 }
 
 function numberToWords(num) {
@@ -1251,34 +1271,7 @@ function setupRemoveSplitButtons() {
     // Minimal implementation: nothing to remove yet as we keep one row by default
 }
 
-// Add this function to handle all button clicks in the table
-function setupEventListeners() {
-    document.body.addEventListener('click', (e) => {
-        // Handle Edit Button clicks
-        const editBtn = e.target.closest('.edit-btn');
-        if (editBtn) {
-            const txId = editBtn.dataset.id;
-            if (txId) {
-                editTransaction(txId);
-            }
-        }
-
-        // Handle Receipt Button clicks
-        const receiptBtn = e.target.closest('.receipt-btn');
-        if (receiptBtn) {
-            const txId = receiptBtn.dataset.id;
-            if (txId) {
-                showReceipt('transaction', transactions.find(t => t.id === txId));
-            }
-        }
-        // Inside the setupEventListeners function in dashboard.js
-const printBtn = document.getElementById('printReceiptBtn');
-if (printBtn) {
-    printBtn.addEventListener('click', handlePrintReceipt);
-}
-        
-    });
-}
+// (Removed duplicate setupEventListeners block)
 
 /*buttons.reset.addEventListener('click', async function () {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
