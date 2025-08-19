@@ -700,12 +700,13 @@ tr.settled-row:hover td {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     background: rgba(0, 0, 0, 0.7);
     z-index: 9999;
     justify-content: center;
     align-items: center;
+    backdrop-filter: blur(2px);
     overflow-y: auto;
 }
 
@@ -740,13 +741,12 @@ tr.settled-row:hover td {
 /* === NEW RECEIPT (V2) STYLES === */
 .receipt-container-v2 {
     background-color: #fff;
-    width: 95vw;
+    width: 95%;
     max-width: 600px;
     margin: 2rem auto;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     font-family: Arial, sans-serif;
     color: #333;
-    border-radius: 12px;
 }
 
 .receipt-body-v2 {
@@ -1251,54 +1251,4 @@ footer {
 
 footer p {
     margin: 0;
-}
-
-@media print {
-  body, html {
-    background: #fff !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-  }
-  .modal, .modal.active, .receipt-container-v2, .pro-receipt {
-    position: static !important;
-    background: #fff !important;
-    box-shadow: none !important;
-    margin: 0 auto !important;
-    width: 100% !important;
-    max-width: 800px !important;
-    min-width: 0 !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
-  }
-  .receipt-body-v2, .pro-receipt {
-    padding: 24px !important;
-    margin: 0 !important;
-    width: 100% !important;
-    box-shadow: none !important;
-    background: #fff !important;
-  }
-  .receipt-actions, .close-btn {
-    display: none !important;
-  }
-  /* Hide everything except the receipt */
-  body * {
-    visibility: hidden !important;
-  }
-  #receiptModal, #receiptModal * {
-    visibility: visible !important;
-  }
-  #receiptModal {
-    position: static !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    background: #fff !important;
-    box-shadow: none !important;
-    z-index: 99999 !important;
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
 }
