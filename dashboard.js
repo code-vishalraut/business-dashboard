@@ -1448,7 +1448,7 @@ function setupRemoveSplitButtons() {
 
 // (Removed duplicate setupEventListeners block)
 
-/*buttons.reset.addEventListener('click', async function () {
+buttons.reset.addEventListener('click', async function () {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
         try {
             await apiCall('clearAllData'); // Assuming a 'clearAllData' action in your proxy
@@ -1467,7 +1467,7 @@ function setupRemoveSplitButtons() {
         }
     }
 });
-*/
+
 
 // === AI Assistant Minimize/Maximize ===
 function toggleAIChat() {
