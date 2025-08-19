@@ -1319,3 +1319,10 @@ footer p {
   }
   .receipt-actions, .close-btn { display: none !important; }
 }
+
+#transactionForm .form-group label input[type="checkbox"] {
+    margin-right: 8px;
+    accent-color: var(--primary);
+    transform: scale(1.2);
+    vertical-align: middle;
+}

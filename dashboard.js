@@ -661,7 +661,35 @@ function renderTransfers() {
     tables.transfersBody.innerHTML = rowsHtml;
 }
 
-// Add this entire function to your dashboard.js file
+// Expense form submit logic (remove received checkbox logic)
+if (forms.expense) {
+    forms.expense.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const split = Array.from(document.querySelectorAll('#expensePayContainer .split-payment-row')).map(r => ({
+            amount: parseFloat(r.querySelector('.expenseAmount').value) || 0,
+            type: r.querySelector('.expensePaymentType').value
+        })).filter(p => p.amount > 0);
+        const total = split.reduce((s, p) => s + p.amount, 0);
+        const ex = {
+            date: document.getElementById('expenseDate').value,
+            category: document.getElementById('expenseCategory').value,
+            item: document.getElementById('expenseItem').value,
+            amount: total,
+            payment_type: split.map(p => p.type).join(', '),
+            split_payments: split
+        };
+        // ADDED: Use apiCall to save expense to Supabase
+        await apiCall('addOrUpdate', { table: 'expenses', data: ex });
+        // Optimistically update UI or wait for real-time update
+        expenses.unshift(ex);
+        renderExpenses();
+        makeStatements();
+        this.reset();
+        modals.expense.style.display = 'none';
+    });
+}
+
+// Transaction form submit logic (keep received logic as is)
 forms.transaction.addEventListener('submit', async function (e) {
     e.preventDefault();
     console.log("Step 1: 'Save Transaction' button clicked.");
@@ -698,8 +726,36 @@ forms.transaction.addEventListener('submit', async function (e) {
 
     console.log("Step 2: Data gathered from form:", txData);
 
+    const received = document.getElementById('transReceived').checked;
+
     if (editingId) {
         txData.id = editingId;
+    }
+
+    if (!received) {
+        // If not received, add to debtors instead of transactions
+        const debtor = {
+            date: txData.date,
+            name: txData.name,
+            phone: txData.phone,
+            amount: txData.in_payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
+            payment_type: txData.in_payments.map(p => p.type).join(', '),
+            split_payments: txData.in_payments,
+            description: txData.description,
+            status: 'Pending'
+        };
+        try {
+            await apiCall('addOrUpdate', { table: 'debtors', data: debtor });
+            debtors.unshift(debtor);
+            renderDebtors();
+            makeStatements();
+            modals.transaction.style.display = 'none';
+            resetTransactionForm();
+            alert('Added to Debtors (not received).');
+        } catch (error) {
+            alert('Failed to add to Debtors.');
+        }
+        return;
     }
 
     try {
@@ -919,7 +975,7 @@ function setupEventListeners() {
         const editBtn = e.target.closest('.edit-btn');
         if (editBtn) {
             const txId = editBtn.dataset.id;
-            if (txId) {
+            if txId) {
                 editTransaction(txId);
             }
         }
@@ -1440,10 +1496,6 @@ function resetSettleForm() {
     form.reset();
     const deleteBtn = document.getElementById('deleteSettleBtn');
     if (deleteBtn) deleteBtn.style.display = 'none';
-}
-
-function setupRemoveSplitButtons() {
-    // Minimal implementation: nothing to remove yet as we keep one row by default
 }
 
 // (Removed duplicate setupEventListeners block)
