@@ -183,7 +183,7 @@ buttons.quickAddCreditor && buttons.quickAddCreditor.addEventListener('click', (
 function updatePaymentTypeOptions() {
     const bankOpts = banks.filter(b => b !== 'Cash' && b !== 'Bank (Generic)').map(b => `<option value="${b}">${b}</option>`).join('');
     const allOpts = `<option value="Cash">Cash</option>${bankOpts}`;
-    document.querySelectorAll('.transInType, .transOutType, .expensePaymentType, .debtorPaymentType, .creditorPaymentType, #settlePaymentType, #transferFrom, #transferTo').forEach(select => {
+    document.querySelectorAll('.transInType, .transOutType, .expensePaymentType, .debtorPaymentType, .creditorPaymentType, #settlePaymentType').forEach(select => {
         if (select) select.innerHTML = allOpts;
     });
 }
@@ -612,7 +612,7 @@ function renderCreditors() {
     if (!body) return;
     const rowsHtml = (creditors || [])
         .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
         .map((c, index) => {
             const amount = Number(c.amount) || 0;
             const dateStr = c.date ? new Date(c.date).toLocaleDateString() : '';
@@ -1095,24 +1095,82 @@ function setupRemoveSplitButtons() {
 }
 
 function makeStatements() {
-    // --- NEW LOGIC ---
-    // Total Income: sum of profit (in - out) for all transactions
+    // Compute totals
     let totalIncome = 0;
+    let totalOutFromTransactions = 0;
+    let totalExpenses = 0;
+
+    let cashBalance = 0;
+    const bankNameToBalance = {};
+
+    // Transactions in/out
     (transactions || []).forEach(tx => {
-        const inTotal = (Array.isArray(tx.in_payments) ? tx.in_payments : []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-        const outTotal = (Array.isArray(tx.out_payments) ? tx.out_payments : []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-        totalIncome += (inTotal - outTotal);
+        const inPayments = Array.isArray(tx.in_payments) ? tx.in_payments : [];
+        const outPayments = Array.isArray(tx.out_payments) ? tx.out_payments : [];
+
+        inPayments.forEach(p => {
+            const amount = Number(p.amount) || 0;
+            totalIncome += amount;
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashBalance += amount;
+            } else if (p.type) {
+                bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) + amount;
+            }
+        });
+
+        outPayments.forEach(p => {
+            const amount = Number(p.amount) || 0;
+            totalOutFromTransactions += amount;
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashBalance -= amount;
+            } else if (p.type) {
+                bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) - amount;
+            }
+        });
     });
 
-    // Total Expenses: sum of all expenses (from expense table only)
-    let totalExpenses = (expenses || []).reduce((sum, ex) => sum + (parseFloat(ex.amount) || 0), 0);
+    // Standalone expenses
+    (expenses || []).forEach(ex => {
+        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
+        if (splits && splits.length) {
+            splits.forEach(p => {
+                const amount = Number(p.amount) || 0;
+                totalExpenses += amount;
+                if ((p.type || '').toLowerCase() === 'cash') {
+                    cashBalance -= amount;
+                } else if (p.type) {
+                    bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) - amount;
+                }
+            });
+        } else {
+            const amount = Number(ex.amount) || 0;
+            totalExpenses += amount;
+            const pType = (ex.payment_type || '').toLowerCase();
+            if (pType === 'cash') {
+                cashBalance -= amount;
+            } else if (ex.payment_type) {
+                bankNameToBalance[ex.payment_type] = (bankNameToBalance[ex.payment_type] || 0) - amount;
+            }
+        }
+    });
 
-    // Net Profit: totalIncome - totalExpenses
-    let netProfit = totalIncome - totalExpenses;
+    // Transfers between accounts do not affect net total, just move balances
+    (transfers || []).forEach(tr => {
+        const amount = Number(tr.amount) || 0;
+        const fromType = (tr.from || '').toLowerCase();
+        const toType = (tr.to || '').toLowerCase();
+        if (fromType === 'cash') cashBalance -= amount;
+        else if (tr.from) bankNameToBalance[tr.from] = (bankNameToBalance[tr.from] || 0) - amount;
+        if (toType === 'cash') cashBalance += amount;
+        else if (tr.to) bankNameToBalance[tr.to] = (bankNameToBalance[tr.to] || 0) + amount;
+    });
+
+    const totalTransactionalExpenses = totalOutFromTransactions + totalExpenses;
+    const netProfit = totalIncome - totalTransactionalExpenses;
 
     // Update top stats
     if (stats.income) stats.income.textContent = totalIncome.toFixed(2);
-    if (stats.expenses) stats.expenses.textContent = totalExpenses.toFixed(2);
+    if (stats.expenses) stats.expenses.textContent = totalTransactionalExpenses.toFixed(2);
     if (stats.profit) stats.profit.textContent = netProfit.toFixed(2);
     if (stats.cash) stats.cash.textContent = cashBalance.toFixed(2);
     const totalBankBalance = Object.values(bankNameToBalance).reduce((a, b) => a + b, 0);
