@@ -206,8 +206,10 @@
         <div class="tab-content" id="tabAccountContent">
             <div class="account-header">
                 <h2><i class="fas fa-university"></i> Bank Accounts</h2>
-                <button id="manageBanksBtn" class="manage-banks-btn"><i class="fas fa-plus-square"></i> ManageBanks</button>
-                <button id="manageBanksBtn" class="manage-banks-btn"><i class="fas fa-plus-square"></i> Manage Banks</button>
+                <div class="account-header-actions">
+                    <button id="addTransferBtn" class="action-btn"><i class="fas fa-exchange-alt"></i> Add Transfer</button>
+                    <button id="manageBanksBtn" class="manage-banks-btn"><i class="fas fa-plus-square"></i> Manage Banks</button>
+                </div>
             </div>
             <div id="bankBalances" class="bank-balances-list"></div>
             <div id="bankStatementSelector">
@@ -262,7 +264,7 @@
                     <input type="number" id="settleAmount" min="0" step="0.01" required>
                     <label>Payment Type</label>
                     <select id="settlePaymentType" required>
-                        </select>
+                    </select>
                     <button type="submit">💾 Confirm Settlement</button>
                 </form>
             </div>
@@ -567,7 +569,8 @@
                 <button onclick="sendToAI()">Send</button>
             </div>
         </div>
-    </div> <footer>
+    </div>
+    <footer>
         <p>&copy; 2025 Digital World. All rights reserved.</p>
     </footer>
 
