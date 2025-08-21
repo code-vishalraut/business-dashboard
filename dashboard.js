@@ -183,7 +183,7 @@ buttons.quickAddCreditor && buttons.quickAddCreditor.addEventListener('click', (
 function updatePaymentTypeOptions() {
     const bankOpts = banks.filter(b => b !== 'Cash' && b !== 'Bank (Generic)').map(b => `<option value="${b}">${b}</option>`).join('');
     const allOpts = `<option value="Cash">Cash</option>${bankOpts}`;
-    document.querySelectorAll('.transInType, .transOutType, .expensePaymentType, .debtorPaymentType, .creditorPaymentType, #settlePaymentType').forEach(select => {
+    document.querySelectorAll('.transInType, .transOutType, .expensePaymentType, .debtorPaymentType, .creditorPaymentType, #settlePaymentType, #transferFrom, #transferTo').forEach(select => {
         if (select) select.innerHTML = allOpts;
     });
 }
