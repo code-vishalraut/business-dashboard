@@ -486,6 +486,26 @@ header h1 {
 #bankStatementSelector {
     margin-top: 20px;
 }
+/* Add this to dashboard.css */
+.account-header-actions {
+    display: flex;
+    gap: 0.8rem;
+}
+
+.action-btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 1rem;
+}
+
 
 /* === BANK MODAL === */
 #banksModal .modal-content {

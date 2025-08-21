@@ -117,9 +117,9 @@ const tabContents = { home: document.getElementById('tabHomeContent'), main: doc
 const stats = { income: document.getElementById('totalIncome'), expenses: document.getElementById('totalExpenses'), profit: document.getElementById('netProfit'), cash: document.getElementById('cashBalance'), bank: document.getElementById('bankBalance') };
 const tables = { transactionsBody: document.getElementById('transactionsBody'), expensesBody: document.getElementById('expensesBody'), debtorsBody: document.getElementById('debtorsBody'), creditorsBody: document.getElementById('creditorsBody'), cashStatementBody: document.getElementById('cashStatementBody') };
 const filters = { category: document.getElementById('filterCategory'), categoryList: document.getElementById('categoryList') };
-const modals = { transaction: document.getElementById('transactionFormModal'), expense: document.getElementById('expenseFormModal'), debtor: document.getElementById('debtorFormModal'), creditor: document.getElementById('creditorFormModal'), receipt: document.getElementById('receiptModal'), banks: document.getElementById('banksModal'), settle: document.getElementById('settleModal') };
-const buttons = { addExpense: document.getElementById('addExpenseBtn'), addDebtor: document.getElementById('addDebtorBtn'), addCreditor: document.getElementById('addCreditorBtn'), quickAddTrans: document.getElementById('quickAddTransBtn'), quickAddExpense: document.getElementById('quickAddExpenseBtn'), quickAddDebtor: document.getElementById('quickAddDebtorBtn'), quickAddCreditor: document.getElementById('quickAddCreditorBtn'), reset: document.getElementById('resetAllBtn'), printReceipt: document.getElementById('printReceiptBtn'), closeReceipt: document.getElementById('closeReceiptBtn'), manageBanks: document.getElementById('manageBanksBtn'), addBank: document.getElementById('addBankBtn'), deleteTransaction: document.getElementById('deleteTransactionBtn') };
-const forms = { transaction: document.getElementById('transactionForm'), expense: document.getElementById('expenseForm'), debtor: document.getElementById('debtorForm'), creditor: document.getElementById('creditorForm'), settle: document.getElementById('settleForm') };
+const modals = { transaction: document.getElementById('transactionFormModal'), expense: document.getElementById('expenseFormModal'), debtor: document.getElementById('debtorFormModal'), creditor: document.getElementById('creditorFormModal'),transfer: document.getElementById('transferFormModal'), receipt: document.getElementById('receiptModal'), banks: document.getElementById('banksModal'), settle: document.getElementById('settleModal') };
+const buttons = {addTransfer: document.getElementById('addTransferBtn'), addExpense: document.getElementById('addExpenseBtn'), addDebtor: document.getElementById('addDebtorBtn'), addCreditor: document.getElementById('addCreditorBtn'), quickAddTrans: document.getElementById('quickAddTransBtn'), quickAddExpense: document.getElementById('quickAddExpenseBtn'), quickAddDebtor: document.getElementById('quickAddDebtorBtn'), quickAddCreditor: document.getElementById('quickAddCreditorBtn'), reset: document.getElementById('resetAllBtn'), printReceipt: document.getElementById('printReceiptBtn'), closeReceipt: document.getElementById('closeReceiptBtn'), manageBanks: document.getElementById('manageBanksBtn'), addBank: document.getElementById('addBankBtn'), deleteTransaction: document.getElementById('deleteTransactionBtn') };
+const forms = { transaction: document.getElementById('transactionForm'), expense: document.getElementById('expenseForm'), debtor: document.getElementById('debtorForm'), creditor: document.getElementById('creditorForm'),transfer: document.getElementById('transferForm'), settle: document.getElementById('settleForm') };
 const exportBtns = { transactions: document.getElementById('exportMainBtn'), expenses: document.getElementById('exportExpensesBtn'), debtors: document.getElementById('exportDebtorsBtn'), creditors: document.getElementById('exportCreditorsBtn'), account: document.getElementById('exportAccountBtn'), cash: document.getElementById('exportCashBtn') };
 let bankStatementFilter = { from: null, to: null };
 
@@ -163,6 +163,7 @@ buttons.quickAddTrans && buttons.quickAddTrans.addEventListener('click', () => {
     ensureDefaultSplitRows();
     showModal('transaction');
 });
+buttons.addTransfer.addEventListener('click', () => showModal('transfer'));
 
 buttons.addExpense && buttons.addExpense.addEventListener('click', () => showModal('expense'));
 buttons.addDebtor && buttons.addDebtor.addEventListener('click', () => showModal('debtor'));
@@ -345,6 +346,28 @@ if (forms.creditor) {
     });
 }
 
+if (forms.transfer) {
+    forms.transfer.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const t = {
+            date: document.getElementById('transferDate').value,
+            from: document.getElementById('transferFrom').value,
+            to: document.getElementById('transferTo').value,
+            amount: parseFloat(document.getElementById('transferAmount').value) || 0,
+            description: document.getElementById('transferDesc').value
+        };
+        try {
+            const savedTransfer = await apiCall('addOrUpdate', { table: 'transfers', data: t });
+            transfers.unshift(savedTransfer);
+            makeStatements();
+            this.reset();
+            modals.transfer.style.display = 'none';
+        } catch (error) {
+            console.error("Error saving transfer:", error);
+            alert('Failed to save transfer.');
+        }
+    });
+}
 // You will need to apply similar changes to all other functions that save or edit data.
 // Replace `localStorage.setItem` with `apiCall`.
 // Replace `data-index` with `data-id`.
