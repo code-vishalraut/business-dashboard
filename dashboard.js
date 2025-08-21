@@ -1349,8 +1349,16 @@ function renderBankStatement(bankName) {
     if (selectedNameElem) selectedNameElem.textContent = bankName || 'None';
     const container = document.getElementById('bankStatementTableContainer');
     if (!container) return;
-    // DESCENDING sort (latest first)
-    const entries = (bankStatements[bankName] || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    // Custom sort: date desc, then in>0 before out>0
+    const entries = (bankStatements[bankName] || []).slice().sort((a, b) => {
+        const da = new Date(a.date || 0);
+        const db = new Date(b.date || 0);
+        if (db - da !== 0) return db - da;
+        // Same date: in>0 comes before out>0
+        if ((b.in > 0 ? 1 : 0) - (a.in > 0 ? 1 : 0) !== 0) return (b.in > 0 ? 1 : 0) - (a.in > 0 ? 1 : 0);
+        if ((a.out > 0 ? 1 : 0) - (b.out > 0 ? 1 : 0) !== 0) return (a.out > 0 ? 1 : 0) - (b.out > 0 ? 1 : 0);
+        return 0;
+    });
     // Calculate running balance from oldest to newest, then display newest first
     let running = 0;
     const balances = [];
