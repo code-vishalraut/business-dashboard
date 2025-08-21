@@ -1351,9 +1351,17 @@ function renderBankStatement(bankName) {
     if (!container) return;
     // DESCENDING sort (latest first)
     const entries = (bankStatements[bankName] || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    // Calculate running balance from oldest to newest, then display newest first
     let running = 0;
-    const rows = entries.map(en => {
+    const balances = [];
+    // Oldest to newest for balance calculation
+    entries.slice().reverse().forEach(en => {
         running += Number(en.in) - Number(en.out);
+        balances.push(running);
+    });
+    balances.reverse(); // Now aligns with entries order (newest first)
+    // Now render newest first, using precomputed balances
+    const rows = entries.map((en, idx) => {
         // Format date as DD/MM/YYYY
         let dateStr = '';
         if (en.date) {
@@ -1365,7 +1373,7 @@ function renderBankStatement(bankName) {
             <td>${en.description || ''}</td>
             <td>₹${(Number(en.in) || 0).toFixed(2)}</td>
             <td>₹${(Number(en.out) || 0).toFixed(2)}</td>
-            <td>₹${running.toFixed(2)}</td>
+            <td>₹${balances[idx].toFixed(2)}</td>
         </tr>`;
     }).join('');
     const tableHtml = `
