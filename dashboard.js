@@ -163,7 +163,11 @@ buttons.quickAddTrans && buttons.quickAddTrans.addEventListener('click', () => {
     ensureDefaultSplitRows();
     showModal('transaction');
 });
-buttons.addTransfer.addEventListener('click', () => showModal('transfer'));
+// The new, corrected code:
+buttons.addTransfer.addEventListener('click', () => {
+    updatePaymentTypeOptions(); // This new line updates the dropdowns first
+    showModal('transfer');      // Then it shows the form
+});
 
 buttons.addExpense && buttons.addExpense.addEventListener('click', () => showModal('expense'));
 buttons.addDebtor && buttons.addDebtor.addEventListener('click', () => showModal('debtor'));
