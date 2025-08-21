@@ -229,8 +229,15 @@ buttons.addBank.addEventListener('click', async () => {
 // EXAMPLE MODIFICATION for renderTransactions
 function renderTransactions() {
     tables.transactionsBody.innerHTML = transactions
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date)) // Newest first
         .map(tx => {
+            // Format date as DD/MM/YYYY
+            let dateStr = '';
+            if (tx.date) {
+                const d = new Date(tx.date);
+                dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            }
             let inTotal = tx.in_payments?.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) || 0;
             let inTypes = tx.in_payments?.map(p => p.type).join(', ') || 'N/A';
             let outTotal = tx.out_payments?.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) || 0;
@@ -238,7 +245,7 @@ function renderTransactions() {
             let profit = inTotal - outTotal;
             return `
                 <tr>
-                    <td>${new Date(tx.date).toLocaleString()}</td>
+                    <td>${dateStr}</td>
                     <td>${tx.name}</td>
                     <td>${tx.phone || ''}</td>
                     <td>${tx.description}</td>
@@ -545,11 +552,18 @@ function renderExpenses() {
     const selectedCategory = filters.category ? filters.category.value : '';
     const filteredExpenses = expenses
         .filter(ex => !selectedCategory || ex.category === selectedCategory)
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
+        .slice()
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .reverse(); // Newest first
 
     tables.expensesBody.innerHTML = filteredExpenses.map(ex => {
+        // Format date as DD/MM/YYYY
+        let dateStr = '';
+        if (ex.date) {
+            const d = new Date(ex.date);
+            dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        }
         const amount = Number(ex.amount) || 0;
-        const dateStr = ex.date ? new Date(ex.date).toLocaleDateString() : '';
         return `
             <tr>
                 <td>${dateStr}</td>
@@ -579,9 +593,15 @@ function renderDebtors() {
     const rowsHtml = (debtors || [])
         .slice()
         .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .reverse() // Newest first
         .map((d, index) => {
+            // Format date as DD/MM/YYYY
+            let dateStr = '';
+            if (d.date) {
+                const dt = new Date(d.date);
+                dateStr = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
+            }
             const amount = Number(d.amount) || 0;
-            const dateStr = d.date ? new Date(d.date).toLocaleDateString() : '';
             return `
                 <tr>
                     <td>${dateStr}</td>
@@ -613,9 +633,15 @@ function renderCreditors() {
     const rowsHtml = (creditors || [])
         .slice()
         .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .reverse() // Newest first
         .map((c, index) => {
+            // Format date as DD/MM/YYYY
+            let dateStr = '';
+            if (c.date) {
+                const dt = new Date(c.date);
+                dateStr = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
+            }
             const amount = Number(c.amount) || 0;
-            const dateStr = c.date ? new Date(c.date).toLocaleDateString() : '';
             return `
                 <tr>
                     <td>${dateStr}</td>
@@ -1196,7 +1222,6 @@ function makeStatements() {
     // Build and render statements (this logic remains the same)
     // ... [rest of the function for building cashStatements, bankStatements, etc.] ...
     // The rest of your makeStatements function for rendering tables should follow here.
-    // The code below is the same as your existing file.
     
     const cashBalanceElem = document.getElementById('cashBalanceCash');
     if (cashBalanceElem) cashBalanceElem.textContent = cashBalance.toFixed(2);
@@ -1236,9 +1261,15 @@ function makeStatements() {
     let runningCash = 0;
     const cashRowsHtml = cashStatements.map(entry => {
         runningCash += Number(entry.in) - Number(entry.out);
+        // Format date as DD/MM/YYYY
+        let dateStr = '';
+        if (entry.date) {
+            const d = new Date(entry.date);
+            dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        }
         return `
             <tr>
-                <td>${entry.date ? new Date(entry.date).toLocaleDateString() : ''}</td>
+                <td>${dateStr}</td>
                 <td>${entry.description || ''}</td>
                 <td>₹${(Number(entry.in) || 0).toFixed(2)}</td>
                 <td>₹${(Number(entry.out) || 0).toFixed(2)}</td>
@@ -1318,12 +1349,19 @@ function renderBankStatement(bankName) {
     if (selectedNameElem) selectedNameElem.textContent = bankName || 'None';
     const container = document.getElementById('bankStatementTableContainer');
     if (!container) return;
-    const entries = (bankStatements[bankName] || []).slice().sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    // DESCENDING sort (latest first)
+    const entries = (bankStatements[bankName] || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     let running = 0;
     const rows = entries.map(en => {
         running += Number(en.in) - Number(en.out);
+        // Format date as DD/MM/YYYY
+        let dateStr = '';
+        if (en.date) {
+            const d = new Date(en.date);
+            dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        }
         return `<tr>
-            <td>${en.date ? new Date(en.date).toLocaleDateString() : ''}</td>
+            <td>${dateStr}</td>
             <td>${en.description || ''}</td>
             <td>₹${(Number(en.in) || 0).toFixed(2)}</td>
             <td>₹${(Number(en.out) || 0).toFixed(2)}</td>
