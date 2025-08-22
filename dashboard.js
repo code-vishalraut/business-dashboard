@@ -1492,99 +1492,81 @@ function renderBankStatement(bankName) {
 
 // --- Settle Debt Logic ---
 async function openSettleModal(type, id) {
-    // Fix: Use correct modal and update payment type options before showing
-    updatePaymentTypeOptions();
+    updatePaymentTypeOptions(); // Ensure payment options are fresh
     const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
     if (!item) return;
 
-    const modalTitle = document.getElementById('settleModalTitle');
-    if (modalTitle) modalTitle.textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-
+    document.getElementById('settleModalTitle').textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     document.getElementById('settleName').textContent = item.name || '';
     document.getElementById('settleOriginalAmount').textContent = Number(item.amount).toFixed(2);
     document.getElementById('settleAmount').value = item.amount;
     document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
     document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
 
-    // Settle date default: today
-    const settleDateInput = document.getElementById('settleDate');
-    if (settleDateInput) {
-        const now = new Date();
-        settleDateInput.value = now.toISOString().slice(0, 16);
-    }
+    // Set settle date default to now
+    document.getElementById('settleDate').value = new Date().toISOString().slice(0, 16);
 
-    // Store type and id for submit
+    // Store type and id for the submit handler
     forms.settle.dataset.settleType = type;
     forms.settle.dataset.editingId = id;
-    modals.settle.style.display = 'flex';
+    showModal('settle');
 }
 
+
+// Replace this entire block
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
     const settleType = this.dataset.settleType;
+    const originalItem = settleType === 'debtor' ? debtors.find(d => d.id === editingId) : creditors.find(c => c.id === editingId);
 
-    const settleData = {
-        date: document.getElementById('settleDate').value,
-        amount: parseFloat(document.getElementById('settleAmount').value) || 0,
-        payment_type: document.getElementById('settlePaymentType').value,
-        description: document.getElementById('settleDescription').value,
-        status: 'Settled'
-    };
-    if (editingId) {
-        settleData.id = editingId;
+    if (!originalItem) {
+        alert("Could not find the original item to settle.");
+        return;
     }
 
+    // 1. Mark the original debtor/creditor as Settled
+    const updatePayload = { ...originalItem, status: 'Settled' };
+    
+    // 2. Create a new transaction for the settlement
+    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
+    const settlePaymentType = document.getElementById('settlePaymentType').value;
+    const transactionData = {
+        date: document.getElementById('settleDate').value,
+        name: originalItem.name,
+        description: document.getElementById('settleDescription').value,
+        status: 'Done',
+        in_payments: [],
+        out_payments: []
+    };
 
+    if (settleType === 'debtor') { // Money comes IN when a debtor pays you back
+        transactionData.in_payments.push({ amount: settleAmount, type: settlePaymentType });
+    } else { // Money goes OUT when you pay a creditor back
+        transactionData.out_payments.push({ amount: settleAmount, type: settlePaymentType });
+    }
 
     try {
+        // Save both updates
+        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: updatePayload });
+        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: transactionData });
+
+        // Update local data
+        transactions.unshift(savedTx);
         if (settleType === 'debtor') {
-            const savedSettle = await apiCall('addOrUpdate', { table: 'debtors', data: settleData });
-            debtors = debtors.map(d => d.id === editingId ? savedSettle : d);
-            renderDebtors();
+            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
         } else {
-            const savedSettle = await apiCall('addOrUpdate', { table: 'creditors', data: settleData });
-            creditors = creditors.map(c => c.id === editingId ? savedSettle : c);
-            renderCreditors();
+            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
         }
-        makeStatements();
+
+        // Re-render everything
+        init();
         modals.settle.style.display = 'none';
-        resetSettleForm();
-        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
+        alert(`${settleType} settled successfully and a transaction was recorded.`);
+
     } catch (error) {
         console.error("Error settling debt:", error);
-        alert('Failed to settle debt. Please check the console.');
-    }
-});
-
-function resetSettleForm() {
-    const form = forms.settle;
-    if (!form) return;
-    form.reset();
-    form.dataset.settleType = '';
-    form.dataset.editingId = '';
-    const deleteBtn = document.getElementById('deleteSettleBtn');
-    if (deleteBtn) deleteBtn.style.display = 'none';
-}
-
-// --- Reset All Data ---
-buttons.reset.addEventListener('click', async function () {
-    if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-        try {
-            await apiCall('clearAllData'); // Assuming a 'clearAllData' action in your proxy
-            transactions = [];
-            expenses = [];
-            debtors = [];
-            creditors = [];
-            transfers = [];
-            banks = ['Bank (Generic)'];
-            categories = [];
-            init();
-            alert('All data reset successfully.');
-        } catch (error) {
-            console.error("Error resetting data:", error);
-            alert('Failed to reset data. Please check the console.');
-        }
+        alert('Failed to settle debt.');
     }
 });
 
