@@ -48,7 +48,8 @@ logoutBtn.addEventListener('click', async () => {
         // Fallback UI switch in case the auth event is delayed
         if (dashboardWrapper) dashboardWrapper.style.display = 'none';
         if (authContainer) authContainer.style.display = 'flex';
-}
+    }
+});
 
 supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || !session) {
@@ -1525,25 +1526,7 @@ forms.settle.addEventListener('submit', async function (e) {
         settleData.id = editingId;
     }
 
-    try {
-        if (settleType === 'debtor') {
-            const savedSettle = await apiCall('addOrUpdate', { table: 'debtors', data: settleData });
-            debtors = debtors.map(d => d.id === editingId ? savedSettle : d);
-            renderDebtors();
-        } else {
-            const savedSettle = await apiCall('addOrUpdate', { table: 'creditors', data: settleData });
-            creditors = creditors.map(c => c.id === editingId ? savedSettle : c);
-            renderCreditors();
-        }
-        makeStatements();
-        modals.settle.style.display = 'none';
-        resetSettleForm();
-        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
-    } catch (error) {
-        console.error("Error settling debt:", error);
-        alert('Failed to settle debt. Please check the console.');
-    }
-});
+
 
     try {
         if (settleType === 'debtor') {
@@ -1559,8 +1542,7 @@ forms.settle.addEventListener('submit', async function (e) {
         modals.settle.style.display = 'none';
         resetSettleForm();
         alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
-    }
-    catch (error) {
+    } catch (error) {
         console.error("Error settling debt:", error);
         alert('Failed to settle debt. Please check the console.');
     }
