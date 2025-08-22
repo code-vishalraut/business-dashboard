@@ -1312,26 +1312,26 @@ function makeStatements() {
         });
     });
 
-    // Debtors (add this block)
+    // Debtors (money minus/out)
     (debtors || []).forEach(db => {
         (Array.isArray(db.split_payments) ? db.split_payments : [{ amount: db.amount, type: db.payment_type }]).forEach(p => {
             if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: db.date, description: db.name || 'Debtor', in: Number(p.amount) || 0, out: 0 });
+                cashStatements.push({ date: db.date, description: db.name || 'Debtor', in: 0, out: Number(p.amount) || 0 });
             } else if (p.type) {
                 if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: db.date, description: db.name || 'Debtor', in: Number(p.amount) || 0, out: 0 });
+                bankStatements[p.type].push({ date: db.date, description: db.name || 'Debtor', in: 0, out: Number(p.amount) || 0 });
             }
         });
     });
 
-    // Creditors (already present for bank, add for cash)
+    // Creditors (money plus/in)
     (creditors || []).forEach(cr => {
         (Array.isArray(cr.split_payments) ? cr.split_payments : [{ amount: cr.amount, type: cr.payment_type }]).forEach(p => {
             if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: 0, out: Number(p.amount) || 0 });
+                cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: Number(p.amount) || 0, out: 0 });
             } else if (p.type) {
                 if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: 0, out: Number(p.amount) || 0 });
+                bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: Number(p.amount) || 0, out: 0 });
             }
         });
     });
@@ -1456,13 +1456,16 @@ async function openSettleModal(type, id) {
     if (!item) return;
 
     const modalTitle = document.getElementById('settleModalTitle');
-    if (modalTitle) modalTitle.textContent = `Settle ${type}`;
+    if (modalTitle) modalTitle.textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
-    document.getElementById('settleDate').value = new Date().toISOString().slice(0, 16);
+    document.getElementById('settleName').textContent = item.name || '';
+    document.getElementById('settleOriginalAmount').textContent = Number(item.amount).toFixed(2);
     document.getElementById('settleAmount').value = item.amount;
     document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
     document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
 
+    // Store type and id for submit
+    forms.settle.dataset.settleType = type;
     forms.settle.dataset.editingId = id;
     showModal('settle');
 }
@@ -1470,32 +1473,33 @@ async function openSettleModal(type, id) {
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
+    const settleType = this.dataset.settleType;
 
     const settleData = {
         date: document.getElementById('settleDate').value,
         amount: parseFloat(document.getElementById('settleAmount').value) || 0,
         payment_type: document.getElementById('settlePaymentType').value,
         description: document.getElementById('settleDescription').value,
-        status: 'Settled' // Assuming settlement means settled
+        status: 'Settled'
     };
-
     if (editingId) {
         settleData.id = editingId;
     }
 
     try {
-        const savedSettle = await apiCall('addOrUpdate', { table: 'debtors', data: settleData });
-        if (type === 'debtor') {
+        if (settleType === 'debtor') {
+            const savedSettle = await apiCall('addOrUpdate', { table: 'debtors', data: settleData });
             debtors = debtors.map(d => d.id === editingId ? savedSettle : d);
             renderDebtors();
         } else {
+            const savedSettle = await apiCall('addOrUpdate', { table: 'creditors', data: settleData });
             creditors = creditors.map(c => c.id === editingId ? savedSettle : c);
             renderCreditors();
         }
         makeStatements();
         modals.settle.style.display = 'none';
         resetSettleForm();
-        alert(`${type} settled successfully.`);
+        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
     } catch (error) {
         console.error("Error settling debt:", error);
         alert('Failed to settle debt. Please check the console.');
@@ -1506,12 +1510,13 @@ function resetSettleForm() {
     const form = forms.settle;
     if (!form) return;
     form.reset();
+    form.dataset.settleType = '';
+    form.dataset.editingId = '';
     const deleteBtn = document.getElementById('deleteSettleBtn');
     if (deleteBtn) deleteBtn.style.display = 'none';
 }
 
-// (Removed duplicate setupEventListeners block)
-
+// --- Reset All Data ---
 buttons.reset.addEventListener('click', async function () {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
         try {
