@@ -48,8 +48,7 @@ logoutBtn.addEventListener('click', async () => {
         // Fallback UI switch in case the auth event is delayed
         if (dashboardWrapper) dashboardWrapper.style.display = 'none';
         if (authContainer) authContainer.style.display = 'flex';
-    }
-});
+}
 
 supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || !session) {
@@ -1314,26 +1313,66 @@ function makeStatements() {
 
     // Debtors (money minus/out)
     (debtors || []).forEach(db => {
+        // Ignore settled for original loan, but add settlement as plus entry
+        const isSettled = db.status === 'Settled';
         (Array.isArray(db.split_payments) ? db.split_payments : [{ amount: db.amount, type: db.payment_type }]).forEach(p => {
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: db.date, description: db.name || 'Debtor', in: 0, out: Number(p.amount) || 0 });
-            } else if (p.type) {
-                if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: db.date, description: db.name || 'Debtor', in: 0, out: Number(p.amount) || 0 });
+            const amt = Number(p.amount) || 0;
+            if (!amt) return;
+            if (!isSettled) {
+                // Loan given (minus)
+                if ((p.type || '').toLowerCase() === 'cash') {
+                    cashStatements.push({ date: db.date, description: db.name || 'Debtor', in: 0, out: amt });
+                } else if (p.type) {
+                    if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                    bankStatements[p.type].push({ date: db.date, description: db.name || 'Debtor', in: 0, out: amt });
+                }
             }
         });
+        // If settled, add settlement as plus (money received back)
+        if (isSettled) {
+            const settleAmt = Number(db.amount) || 0;
+            const settleType = (db.payment_type || '').toLowerCase();
+            if (settleAmt) {
+                if (settleType === 'cash') {
+                    cashStatements.push({ date: db.date, description: (db.name || 'Debtor') + ' (Settled)', in: settleAmt, out: 0 });
+                } else if (db.payment_type) {
+                    if (!bankStatements[db.payment_type]) bankStatements[db.payment_type] = [];
+                    bankStatements[db.payment_type].push({ date: db.date, description: (db.name || 'Debtor') + ' (Settled)', in: settleAmt, out: 0 });
+                }
+            }
+        }
     });
 
     // Creditors (money plus/in)
     (creditors || []).forEach(cr => {
+        // Ignore settled for original loan, but add settlement as minus entry
+        const isSettled = cr.status === 'Settled';
         (Array.isArray(cr.split_payments) ? cr.split_payments : [{ amount: cr.amount, type: cr.payment_type }]).forEach(p => {
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: Number(p.amount) || 0, out: 0 });
-            } else if (p.type) {
-                if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: Number(p.amount) || 0, out: 0 });
+            const amt = Number(p.amount) || 0;
+            if (!amt) return;
+            if (!isSettled) {
+                // Loan taken (plus)
+                if ((p.type || '').toLowerCase() === 'cash') {
+                    cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
+                } else if (p.type) {
+                    if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                    bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
+                }
             }
         });
+        // If settled, add settlement as minus (money paid back)
+        if (isSettled) {
+            const settleAmt = Number(cr.amount) || 0;
+            const settleType = (cr.payment_type || '').toLowerCase();
+            if (settleAmt) {
+                if (settleType === 'cash') {
+                    cashStatements.push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
+                } else if (cr.payment_type) {
+                    if (!bankStatements[cr.payment_type]) bankStatements[cr.payment_type] = [];
+                    bankStatements[cr.payment_type].push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
+                }
+            }
+        }
     });
 
     // Transfers
@@ -1506,6 +1545,27 @@ forms.settle.addEventListener('submit', async function (e) {
     }
 });
 
+    try {
+        if (settleType === 'debtor') {
+            const savedSettle = await apiCall('addOrUpdate', { table: 'debtors', data: settleData });
+            debtors = debtors.map(d => d.id === editingId ? savedSettle : d);
+            renderDebtors();
+        } else {
+            const savedSettle = await apiCall('addOrUpdate', { table: 'creditors', data: settleData });
+            creditors = creditors.map(c => c.id === editingId ? savedSettle : c);
+            renderCreditors();
+        }
+        makeStatements();
+        modals.settle.style.display = 'none';
+        resetSettleForm();
+        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
+    }
+    catch (error) {
+        console.error("Error settling debt:", error);
+        alert('Failed to settle debt. Please check the console.');
+    }
+});
+
 function resetSettleForm() {
     const form = forms.settle;
     if (!form) return;
@@ -1536,6 +1596,8 @@ buttons.reset.addEventListener('click', async function () {
         }
     }
 });
+
+
 
 
 // === AI Assistant Minimize/Maximize ===
