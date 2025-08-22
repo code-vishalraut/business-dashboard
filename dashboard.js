@@ -1492,6 +1492,8 @@ function renderBankStatement(bankName) {
 
 // --- Settle Debt Logic ---
 async function openSettleModal(type, id) {
+    // Fix: Use correct modal and update payment type options before showing
+    updatePaymentTypeOptions();
     const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
     if (!item) return;
 
@@ -1504,10 +1506,17 @@ async function openSettleModal(type, id) {
     document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
     document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
 
+    // Settle date default: today
+    const settleDateInput = document.getElementById('settleDate');
+    if (settleDateInput) {
+        const now = new Date();
+        settleDateInput.value = now.toISOString().slice(0, 16);
+    }
+
     // Store type and id for submit
     forms.settle.dataset.settleType = type;
     forms.settle.dataset.editingId = id;
-    showModal('settle');
+    modals.settle.style.display = 'flex';
 }
 
 forms.settle.addEventListener('submit', async function (e) {
