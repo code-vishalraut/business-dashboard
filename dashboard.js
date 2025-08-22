@@ -553,7 +553,7 @@ function renderExpenses() {
     const filteredExpenses = expenses
         .filter(ex => !selectedCategory || ex.category === selectedCategory)
         .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
         .reverse(); // Newest first
 
     tables.expensesBody.innerHTML = filteredExpenses.map(ex => {
@@ -592,7 +592,7 @@ function renderDebtors() {
     if (!body) return;
     const rowsHtml = (debtors || [])
         .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
         .reverse() // Newest first
         .map((d, index) => {
             // Format date as DD/MM/YYYY
@@ -632,7 +632,7 @@ function renderCreditors() {
     if (!body) return;
     const rowsHtml = (creditors || [])
         .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
         .reverse() // Newest first
         .map((c, index) => {
             // Format date as DD/MM/YYYY
@@ -1283,6 +1283,7 @@ function makeStatements() {
     const allBankNames = new Set(banks.filter(b => b && b !== 'Cash' && b !== 'Bank (Generic)'));
     allBankNames.forEach(bankName => { bankStatements[bankName] = []; });
 
+    // Transactions
     (transactions || []).forEach(tx => {
         (Array.isArray(tx.in_payments) ? tx.in_payments : []).forEach(p => {
             if (p.type && (p.type || '').toLowerCase() !== 'cash') {
@@ -1297,14 +1298,45 @@ function makeStatements() {
             }
         });
     });
+
+    // Expenses
     (expenses || []).forEach(ex => {
         (Array.isArray(ex.split_payments) ? ex.split_payments : [{ amount: ex.amount, type: ex.payment_type }]).forEach(p => {
             if (p.type && (p.type || '').toLowerCase() !== 'cash') {
                 if (!bankStatements[p.type]) bankStatements[p.type] = [];
                 bankStatements[p.type].push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: Number(p.amount) || 0 });
             }
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: Number(p.amount) || 0 });
+            }
         });
     });
+
+    // Debtors (add this block)
+    (debtors || []).forEach(db => {
+        (Array.isArray(db.split_payments) ? db.split_payments : [{ amount: db.amount, type: db.payment_type }]).forEach(p => {
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: db.date, description: db.name || 'Debtor', in: Number(p.amount) || 0, out: 0 });
+            } else if (p.type) {
+                if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                bankStatements[p.type].push({ date: db.date, description: db.name || 'Debtor', in: Number(p.amount) || 0, out: 0 });
+            }
+        });
+    });
+
+    // Creditors (already present for bank, add for cash)
+    (creditors || []).forEach(cr => {
+        (Array.isArray(cr.split_payments) ? cr.split_payments : [{ amount: cr.amount, type: cr.payment_type }]).forEach(p => {
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: 0, out: Number(p.amount) || 0 });
+            } else if (p.type) {
+                if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: 0, out: Number(p.amount) || 0 });
+            }
+        });
+    });
+
+    // Transfers
     (transfers || []).forEach(tr => {
         const amount = Number(tr.amount) || 0;
         if (tr.from && (tr.from || '').toLowerCase() !== 'cash') {
