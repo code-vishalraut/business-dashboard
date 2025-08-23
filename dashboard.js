@@ -1685,8 +1685,9 @@ function makeStatements() {
         });
     });
 
-    // Debtors (money minus/out, settlement as plus/in)
+    // Debtors (money minus/out)
     (debtors || []).forEach(db => {
+        // Ignore settled for original loan, but add settlement as plus entry
         const isSettled = db.status === 'Settled';
         (Array.isArray(db.split_payments) ? db.split_payments : [{ amount: db.amount, type: db.payment_type }]).forEach(p => {
             const amt = Number(p.amount) || 0;
@@ -1716,8 +1717,9 @@ function makeStatements() {
         }
     });
 
-    // Creditors (money plus/in, settlement as minus/out)
+    // Creditors (money plus/in)
     (creditors || []).forEach(cr => {
+        // Ignore settled for original loan, but add settlement as minus entry
         const isSettled = cr.status === 'Settled';
         (Array.isArray(cr.split_payments) ? cr.split_payments : [{ amount: cr.amount, type: cr.payment_type }]).forEach(p => {
             const amt = Number(p.amount) || 0;
@@ -1883,7 +1885,8 @@ async function openSettleModal(type, id) {
     showModal('settle');
 }
 
-// --- Settle Form Submit: Only update status, do NOT create a transaction (fix double counting) ---
+
+// Replace this entire block
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
@@ -1895,29 +1898,45 @@ forms.settle.addEventListener('submit', async function (e) {
         return;
     }
 
-    // Only update the original debtor/creditor as Settled, with new amount/type/date/desc if changed
-    const settleData = {
-        ...originalItem,
+    // 1. Mark the original debtor/creditor as Settled
+    const updatePayload = { ...originalItem, status: 'Settled' };
+    
+    // 2. Create a new transaction for the settlement
+    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
+    const settlePaymentType = document.getElementById('settlePaymentType').value;
+    const transactionData = {
         date: document.getElementById('settleDate').value,
-        amount: parseFloat(document.getElementById('settleAmount').value) || 0,
-        payment_type: document.getElementById('settlePaymentType').value,
+        name: originalItem.name,
         description: document.getElementById('settleDescription').value,
-        status: 'Settled'
+        status: 'Done',
+        in_payments: [],
+        out_payments: []
     };
 
+    if (settleType === 'debtor') { // Money comes IN when a debtor pays you back
+        transactionData.in_payments.push({ amount: settleAmount, type: settlePaymentType });
+    } else { // Money goes OUT when you pay a creditor back
+        transactionData.out_payments.push({ amount: settleAmount, type: settlePaymentType });
+    }
+
     try {
-        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: settleData });
+        // Save both updates
+        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: updatePayload });
+        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: transactionData });
+
+        // Update local data
+        transactions.unshift(savedTx);
         if (settleType === 'debtor') {
-            debtors = debtors.map(d => d.id === editingId ? settleData : d);
+            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
         } else {
-            creditors = creditors.map(c => c.id === editingId ? settleData : c);
+            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
         }
-        renderDebtors();
-        renderCreditors();
-        makeStatements();
+
+        // Re-render everything
+        init();
         modals.settle.style.display = 'none';
-        resetSettleForm();
-        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
+        alert(`${settleType} settled successfully and a transaction was recorded.`);
+
     } catch (error) {
         console.error("Error settling debt:", error);
         alert('Failed to settle debt.');
@@ -1925,311 +1944,16 @@ forms.settle.addEventListener('submit', async function (e) {
 });
 
 
-// =================================================================
-// ADDED: Minimal implementations for missing functions
-// =================================================================
 
-function updateTrendChart() {
-    const period = parseInt(document.getElementById('chartPeriod').value) || 30;
-    const dataType = document.getElementById('chartDataType').value || 'profit';
-    const ctx = document.getElementById('trendChart').getContext('2d');
 
-    // Prepare data
-    const labels = [];
-    const dataPoints = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let i = period - 1; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - i);
-        labels.push(date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }));
-
-        let dayTotal = 0;
-        // This is a simplified calculation. You can make it more detailed.
-        if (dataType === 'income') {
-            transactions.forEach(tx => {
-                if (new Date(tx.date).toDateString() === date.toDateString()) {
-                    dayTotal += (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-                }
-            });
-        } else if (dataType === 'expense') {
-            expenses.forEach(ex => {
-                if (new Date(ex.date).toDateString() === date.toDateString()) {
-                    dayTotal += Number(ex.amount);
-                }
-            });
-        }
-        dataPoints.push(dayTotal);
-    }
-
-    // Destroy the old chart if it exists
-    if (trendChart) {
-        trendChart.destroy();
-    }
-
-    // Create the new chart
-    trendChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: dataType.charAt(0).toUpperCase() + dataType.slice(1),
-                data: dataPoints,
-                borderColor: 'rgb(0, 150, 136)',
-                backgroundColor: 'rgba(0, 150, 136, 0.1)',
-                fill: true,
-                tension: 0.4,
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false
-                }
-            }
-        }
-    });
-}
-
-function updateBankPieChart() {
-    const ctx = document.getElementById('bankPieChart').getContext('2d');
-    const bankBalances = {};
-
-    // Calculate balances from transactions
-    transactions.forEach(tx => {
-        (tx.in_payments || []).forEach(p => {
-            if (p.type !== 'Cash') {
-                bankBalances[p.type] = (bankBalances[p.type] || 0) + Number(p.amount);
-            }
-        });
-        (tx.out_payments || []).forEach(p => {
-            if (p.type !== 'Cash') {
-                bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount);
-            }
-        });
-    });
-
-    // Subtract expenses paid from banks (supports split payments)
-    expenses.forEach(ex => {
-        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
-        if (splits && splits.length) {
-            splits.forEach(p => {
-                if ((p.type || '').toLowerCase() !== 'cash') {
-                    bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount || 0);
-                }
-            });
-        } else if ((ex.payment_type || '').toLowerCase() !== 'cash') {
-            bankBalances[ex.payment_type] = (bankBalances[ex.payment_type] || 0) - Number(ex.amount || 0);
-        }
-    });
-
-    const labels = Object.keys(bankBalances);
-    const data = Object.values(bankBalances);
-
-    if (bankPieChart) {
-        bankPieChart.destroy();
-    }
-
-    bankPieChart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Bank Balance',
-                data: data,
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.8)',
-                    'rgba(54, 162, 235, 0.8)',
-                    'rgba(255, 206, 86, 0.8)',
-                    'rgba(75, 192, 192, 0.8)',
-                    'rgba(153, 102, 255, 0.8)',
-                    'rgba(255, 159, 64, 0.8)'
-                ],
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-        }
-    });
-}
-function renderCategoryFilter() {
-    const categorySelect = filters.category;
-    if (!categorySelect) return;
-    const uniqueCategories = Array.from(new Set(expenses.map(e => e.category).filter(Boolean))).sort();
-    const optionsHtml = ['<option value="">All</option>'].concat(uniqueCategories.map(c => `<option value="${c}">${c}</option>`)).join('');
-    categorySelect.innerHTML = optionsHtml;
-    categorySelect.onchange = () => renderExpenses();
-}
-
-function renderExpenses() {
-    if (!tables.expensesBody) return;
-    const selectedCategory = filters.category ? filters.category.value : '';
-    const filteredExpenses = expenses
-        .filter(ex => !selectedCategory || ex.category === selectedCategory)
-        .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
-        .reverse(); // Newest first
-
-    tables.expensesBody.innerHTML = filteredExpenses.map(ex => {
-        // Format date as DD/MM/YYYY
-        let dateStr = '';
-        if (ex.date) {
-            const d = new Date(ex.date);
-            dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-        }
-        const amount = Number(ex.amount) || 0;
-        return `
-            <tr>
-                <td>${dateStr}</td>
-                <td>${ex.category || ''}</td>
-                <td>${ex.item || ''}</td>
-                <td>₹${amount.toFixed(2)}</td>
-                <td>${ex.payment_type || ''}</td>
-                <td><button class="receipt-btn" data-type="expense" data-id="${ex.id}"><i class="fas fa-receipt"></i></button></td>
-                <td>—</td>
-            </tr>`;
-    }).join('');
-    // ADDED: Event listener for expense receipt buttons
-    document.querySelectorAll('#expensesBody .receipt-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const expenseId = this.getAttribute('data-id');
-            const expense = expenses.find(e => e.id === expenseId);
-            if (expense) {
-                showReceipt('expense', expense);
-            }
-        });
-    });
-}
-
-function renderDebtors() {
-    const body = document.getElementById('debtorsBody');
-    if (!body) return;
-    const rowsHtml = (debtors || [])
-        .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
-        .reverse() // Newest first
-        .map((d, index) => {
-            // Format date as DD/MM/YYYY
-            let dateStr = '';
-            if (d.date) {
-                const dt = new Date(d.date);
-                dateStr = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
-            }
-            const amount = Number(d.amount) || 0;
-            return `
-                <tr>
-                    <td>${dateStr}</td>
-                    <td>${d.name || ''}</td>
-                    <td>${d.phone || ''}</td>
-                    <td>₹${amount.toFixed(2)}</td>
-                    <td>${d.payment_type || ''}</td>
-                    <td>${d.description || ''}</td>
-                    <td>${d.status || 'Pending'}</td>
-                    <td><button class="settle-btn" data-type="debtor" data-id="${d.id}" ${d.status === 'Settled' ? 'disabled' : ''}>${d.status === 'Settled' ? 'Settled' : 'Settle'}</button></td>
-                </tr>`;
-        }).join('');
-    body.innerHTML = rowsHtml;
-    // ADDED: Event listener for debtor settle buttons
-    document.querySelectorAll('#debtorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const debtorId = this.getAttribute('data-id');
-            const debtor = debtors.find(d => d.id === debtorId);
-            if (debtor) {
-                openSettleModal('debtor', debtorId); // Pass type and ID
-            }
-        });
-    });
-}
-
-function renderCreditors() {
-    const body = document.getElementById('creditorsBody');
-    if (!body) return;
-    const rowsHtml = (creditors || [])
-        .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
-        .reverse() // Newest first
-        .map((c, index) => {
-            // Format date as DD/MM/YYYY
-            let dateStr = '';
-            if (c.date) {
-                const dt = new Date(c.date);
-                dateStr = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
-            }
-            const amount = Number(c.amount) || 0;
-            return `
-                <tr>
-                    <td>${dateStr}</td>
-                    <td>${c.name || ''}</td>
-                    <td>${c.phone || ''}</td>
-                    <td>₹${amount.toFixed(2)}</td>
-                    <td>${c.payment_type || ''}</td>
-                    <td>${c.description || ''}</td>
-                    <td>${c.status || 'Pending'}</td>
-                    <td><button class="settle-btn" data-type="creditor" data-id="${c.id}" ${c.status === 'Settled' ? 'disabled' : ''}>${c.status === 'Settled' ? 'Settled' : 'Settle'}</button></td>
-                </tr>`;
-        }).join('');
-    body.innerHTML = rowsHtml;
-    // ADDED: Event listener for creditor settle buttons
-    document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const creditorId = this.getAttribute('data-id');
-            const creditor = creditors.find(c => c.id === creditorId);
-            if (creditor) {
-                openSettleModal('creditor', creditorId);
-            }
-        });
-    });
-}
-
-// Debtor and Creditor settle modal reset
-function resetSettleForm() {
-    const form = forms.settle;
-    if (!form) return;
-    form.reset();
-    document.getElementById('settleName').textContent = '';
-    document.getElementById('settleOriginalAmount').textContent = '0.00';
-    document.getElementById('settleAmount').value = '';
-    document.getElementById('settlePaymentType').value = 'Cash';
-    document.getElementById('settleDescription').value = '';
-}
-
-// Settlement logic (moved from form submit for clarity)
-async function settleItem(type, id) {
-    const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
-    if (!item) return;
-
-    const settleData = {
-        ...item,
-        date: document.getElementById('settleDate').value,
-        amount: parseFloat(document.getElementById('settleAmount').value) || 0,
-        payment_type: document.getElementById('settlePaymentType').value,
-        description: document.getElementById('settleDescription').value,
-        status: 'Settled'
-    };
-
-    try {
-        await apiCall('addOrUpdate', { table: (type === 'debtor' ? 'debtors' : 'creditors'), data: settleData });
-        if (type === 'debtor') {
-            debtors = debtors.map(d => d.id === id ? settleData : d);
-        } else {
-            creditors = creditors.map(c => c.id === id ? settleData : c);
-        }
-        renderDebtors();
-        renderCreditors();
-        makeStatements();
-        alert(`${type.charAt(0).toUpperCase() + type.slice(1)} settled successfully.`);
-    } catch (error) {
-        console.error("Error settling debt:", error);
-        alert('Failed to settle debt.');
+// === AI Assistant Minimize/Maximize ===
+function toggleAIChat() {
+    const aiBox = document.getElementById('aiAssistant');
+    if (!aiBox) return;
+    aiBox.classList.toggle('minimized');
+    // Change icon
+    const icon = document.getElementById('aiToggleIcon');
+    if (icon) {
+        icon.textContent = aiBox.classList.contains('minimized') ? '+' : '−';
     }
 }
