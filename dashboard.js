@@ -1589,7 +1589,17 @@ function makeStatements() {
     
     // Update balance stats
     if (stats.cash) stats.cash.textContent = cashBalance.toFixed(2);
-    const totalBankBalance = Object.values(bankNameToBalance).reduce((a, b) => a + b, 0);
+    
+    // Calculate total bank balance from actual statements
+    let totalBankBalance = 0;
+    Object.keys(bankStatements).forEach(bankName => {
+        const statements = bankStatements[bankName] || [];
+        const bankBalance = statements.reduce((total, entry) => {
+            return total + (Number(entry.in) || 0) - (Number(entry.out) || 0);
+        }, 0);
+        totalBankBalance += bankBalance;
+    });
+    
     if (stats.bank) stats.bank.textContent = totalBankBalance.toFixed(2);
 
     // Build and render statements (this logic remains the same)
@@ -1769,10 +1779,15 @@ function makeStatements() {
     const bankBalancesElem = document.getElementById('bankBalances');
     if (bankBalancesElem) {
         const entries = Array.from(allBankNames).sort().map(bankName => {
-            const bal = bankNameToBalance[bankName] || 0;
+            // Calculate actual statement balance for this bank
+            const statements = bankStatements[bankName] || [];
+            const statementBalance = statements.reduce((total, entry) => {
+                return total + (Number(entry.in) || 0) - (Number(entry.out) || 0);
+            }, 0);
+            
             return `<div class="bank-balance-item" data-bank="${bankName}" style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid #eee;cursor:pointer;">
                         <span>${bankName}</span>
-                        <span>₹${bal.toFixed(2)}</span>
+                        <span>₹${statementBalance.toFixed(2)}</span>
                     </div>`;
         }).join('');
         bankBalancesElem.innerHTML = entries || '<div style="color:#777;">No banks yet</div>';
