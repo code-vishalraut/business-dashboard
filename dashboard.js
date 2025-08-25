@@ -467,41 +467,6 @@ function init() {
         });
     }
 
-    // Form submissions with null checks
-    const transactionForm = document.getElementById('transactionForm');
-    if (transactionForm) transactionForm.addEventListener('submit', saveTransaction);
-
-    const expenseForm = document.getElementById('expenseForm');
-    if (expenseForm) expenseForm.addEventListener('submit', saveExpense);
-
-    const debtorForm = document.getElementById('debtorForm');
-    if (debtorForm) debtorForm.addEventListener('submit', saveDebtor);
-
-    const creditorForm = document.getElementById('creditorForm');
-    if (creditorForm) creditorForm.addEventListener('submit', saveCreditor);
-
-    const transferForm = document.getElementById('transferForm');
-    if (transferForm) transferForm.addEventListener('submit', saveTransfer);
-
-    const settleForm = document.getElementById('settleForm');
-    if (settleForm) settleForm.addEventListener('submit', processSettle);
-
-    const profileForm = document.getElementById('profileForm');
-    if (profileForm) profileForm.addEventListener('submit', saveProfile);
-
-    // Button handlers with null checks
-    const resetAllBtn = document.getElementById('resetAllBtn');
-    if (resetAllBtn) resetAllBtn.addEventListener('click', handleResetAll);
-
-    const addBankBtn = document.getElementById('addBankBtn');
-    if (addBankBtn) addBankBtn.addEventListener('click', addBank);
-
-    const deleteTransactionBtn = document.getElementById('deleteTransactionBtn');
-    if (deleteTransactionBtn) deleteTransactionBtn.addEventListener('click', deleteTransaction);
-
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) logoutBtn.addEventListener('click', logout);
-
     // Tab functionality with null checks
     const tabs = document.querySelectorAll('.tab');
     if (tabs) {
