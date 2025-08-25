@@ -429,12 +429,12 @@ function updateProfileDisplay() {
 }
 
 function setupProfileEventListeners() {
-    const editProfileBtn = document.getElementById('editProfileBtn');
+    const profileHeader = document.getElementById('profileHeader');
     const profileForm = document.getElementById('profileForm');
     const profileImageInput = document.getElementById('profileImageInput');
     
-    if (editProfileBtn) {
-        editProfileBtn.addEventListener('click', () => {
+    if (profileHeader) {
+        profileHeader.addEventListener('click', () => {
             // Populate form with current data
             document.getElementById('profileNameInput').value = profileData.name;
             document.getElementById('profilePhoneInput').value = profileData.phone;

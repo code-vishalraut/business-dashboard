@@ -34,10 +34,12 @@
                 style="padding: 8px 12px; background-color: #DC3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Logout</button>
         </div>
 
-        <header>
-            <img src="pf.JPG" alt="Business Logo" class="logo">
-            <h1>Digital World</h1>
-        </header>
+        <div class="profile-header" id="profileHeader">
+            <div class="profile-image">
+                <img src="pf.JPG" alt="Profile" id="profileImage">
+            </div>
+            <h1 id="profileName">Digital World</h1>
+        </div>
 
         <div class="dashboard-stats-container">
             <div class="dashboard-stats">
@@ -67,24 +69,6 @@
             <div class="controls" id="homeControls">
                 <button id="resetAllBtn">🗑️ Export & Reset All Data</button>
                 <label><input type="checkbox" id="exportBeforeReset" checked> Export before reset</label>
-            </div>
-        </div>
-
-        <div class="profile-section">
-            <div class="profile-card" id="profileCard">
-                <div class="profile-image">
-                    <img src="pf.JPG" alt="Profile" id="profileImage">
-                </div>
-                <div class="profile-info">
-                    <h3 id="profileName">Digital World</h3>
-                    <p id="profilePhone">7547034664</p>
-                    <p id="profileEmail">support@digitalworld.com</p>
-                    <p id="profileWebsite">www.digitalworld.com</p>
-                    <p id="profileAddress">Your Address Here</p>
-                </div>
-                <button id="editProfileBtn" class="edit-profile-btn">
-                    <i class="fas fa-edit"></i> Edit Profile
-                </button>
             </div>
         </div>
 
