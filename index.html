@@ -93,32 +93,30 @@
         </div>
 
         <div class="tab-content active" id="tabHomeContent">
-            <div class="chart-controls" style="margin-bottom: 1.5rem;">
-                <select id="chartPeriod">
-                    <option value="7">Last 7 Days</option>
-                    <option value="15">Last 15 Days</option>
-                    <option value="30">Last 30 Days</option>
-                </select>
-                <select id="chartDataType">
-                    <option value="income">Income</option>
-                    <option value="expense">Expense</option>
-                    <option value="profit">Profit</option>
-                    <option value="cash">Cash Flow</option>
-                    <option value="bank">Bank Flow</option>
-                </select>
-            </div>
-            <div id="miniTrendChartContainer" style="margin: 24px 0;">
-                <canvas id="miniTrendChart" height="60"></canvas>
-            </div>
-
-            <div id="bankPieChartContainer"
-                style="margin: 32px auto; max-width: 480px; background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 1rem;">
-                <h3 style="text-align:center; margin-bottom: 1rem;">Bank-wise Balance %</h3>
-                <canvas id="bankPieChart" height="180"></canvas>
-            </div>
-
-            <div id="trendChartContainer" style="margin: 24px 0;">
-                <canvas id="trendChart" height="60"></canvas>
+            
+            <div class="charts-layout">
+                <div class="trend-chart-section">
+                    <h3>Financial Trends</h3>
+                    <div class="chart-period-tabs">
+                        <button class="period-tab active" data-period="7">7 Days</button>
+                        <button class="period-tab" data-period="15">15 Days</button>
+                        <button class="period-tab" data-period="30">30 Days</button>
+                    </div>
+                    <div class="chart-legend">
+                        <span class="legend-item income"><span class="legend-color"></span>Income</span>
+                        <span class="legend-item expense"><span class="legend-color"></span>Expenses</span>
+                    </div>
+                    <div id="trendChartContainer">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="pie-chart-section">
+                    <h3>Account Balances</h3>
+                    <div id="bankPieChartContainer">
+                        <canvas id="bankPieChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
 

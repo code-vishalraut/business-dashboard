@@ -81,12 +81,12 @@ async function initializeDashboard(user) {
         creditors = allData.creditors || [];
         transfers = allData.transfers || [];
         banks = ['Bank (Generic)'].concat((allData.banks || []).map(b => b.name));
-        
+
         // Load profile data
         if (allData.profile && allData.profile.length > 0) {
             profileData = { ...profileData, ...allData.profile[0] };
         }
-        
+
         init(); // Call your original init function
         setupRealtimeListeners();
         updateProfileDisplay();
@@ -420,7 +420,7 @@ function init() {
 function updateProfileDisplay() {
     const nameElement = document.getElementById('profileName');
     const imageElement = document.getElementById('profileImage');
-    
+
     if (nameElement) {
         nameElement.textContent = profileData.name;
     }
@@ -433,7 +433,7 @@ function setupProfileEventListeners() {
     const profileHeader = document.querySelector('.top-header-center');
     const profileForm = document.getElementById('profileForm');
     const profileImageInput = document.getElementById('profileImageInput');
-    
+
     if (profileHeader) {
         profileHeader.addEventListener('click', () => {
             // Populate form with current data
@@ -445,7 +445,7 @@ function setupProfileEventListeners() {
             showModal('profile');
         });
     }
-    
+
     if (profileImageInput) {
         profileImageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -459,11 +459,11 @@ function setupProfileEventListeners() {
             }
         });
     }
-    
+
     if (profileForm) {
         profileForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const updatedProfile = {
                 name: document.getElementById('profileNameInput').value,
                 phone: document.getElementById('profilePhoneInput').value,
@@ -472,7 +472,7 @@ function setupProfileEventListeners() {
                 address: document.getElementById('profileAddressInput').value,
                 image: profileData.image
             };
-            
+
             try {
                 await apiCall('addOrUpdate', { table: 'profile', data: updatedProfile });
                 profileData = updatedProfile;
@@ -496,42 +496,41 @@ function getProfileData() {
 // =================================================================
 
 function updateTrendChart() {
-    const period = parseInt(document.getElementById('chartPeriod').value) || 30;
-    const dataType = document.getElementById('chartDataType').value || 'profit';
+    const period = parseInt(document.querySelector('.period-tab.active')?.dataset.period) || 7;
     const ctx = document.getElementById('trendChart').getContext('2d');
 
     // Prepare data
     const labels = [];
-    const dataPoints = [];
+    const incomeData = [];
+    const expenseData = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     for (let i = period - 1; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
-        labels.push(date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }));
+        labels.push(date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
-        let dayTotal = 0;
-        // This is a simplified calculation. You can make it more detailed.
-        if (dataType === 'income') {
-            transactions.forEach(tx => {
-                if (new Date(tx.date).toDateString() === date.toDateString()) {
-                    dayTotal += (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-                }
-            });
-        } else if (dataType === 'expense') {
-            expenses.forEach(ex => {
-                if (new Date(ex.date).toDateString() === date.toDateString()) {
-                    dayTotal += Number(ex.amount);
-                }
-            });
-        }
-        dataPoints.push(dayTotal);
-    }
+        // Calculate income for this day
+        let dayIncome = 0;
+        transactions.forEach(tx => {
+            if (new Date(tx.date).toDateString() === date.toDateString()) {
+                const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                dayIncome += (inTotal - outTotal); // Profit from transactions
+            }
+        });
 
-    // Destroy the old chart if it exists
-    if (trendChart) {
-        trendChart.destroy();
+        // Calculate expenses for this day
+        let dayExpense = 0;
+        expenses.forEach(ex => {
+            if (new Date(ex.date).toDateString() === date.toDateString()) {
+                dayExpense += Number(ex.amount);
+            }
+        });
+
+        incomeData.push(Math.max(0, dayIncome)); // Only positive profits count as income
+        expenseData.push(dayExpense);
     }
 
     // Create the new chart
@@ -539,27 +538,61 @@ function updateTrendChart() {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{
-                label: dataType.charAt(0).toUpperCase() + dataType.slice(1),
-                data: dataPoints,
-                borderColor: 'rgb(0, 150, 136)',
-                backgroundColor: 'rgba(0, 150, 136, 0.1)',
-                fill: true,
-                tension: 0.4,
-                borderWidth: 2
-            }]
+            datasets: [
+                {
+                    label: 'Income',
+                    data: incomeData,
+                    borderColor: '#4caf50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Expenses',
+                    data: expenseData,
+                    borderColor: '#f44336',
+                    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
             scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
                 }
             },
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    titleColor: '#333',
+                    bodyColor: '#666',
+                    borderColor: '#ddd',
+                    borderWidth: 1
                 }
             }
         }
@@ -1024,7 +1057,7 @@ function showReceipt(type, data) {
     setText('receiptBusinessEmail', profileData.email);
     setText('receiptBusinessWebsite', profileData.website);
     setText('receiptBusinessAddress', profileData.address);
-    
+
     const receiptLogo = document.getElementById('receiptLogo');
     if (receiptLogo && profileData.image) {
         receiptLogo.src = profileData.image;
@@ -1034,7 +1067,7 @@ function showReceipt(type, data) {
     setText('receiptSubTotal', `₹${billTotal.toFixed(2)}`);
     setText('receiptTaxes', `₹${(0).toFixed(2)}`);
     setText('receiptGrandTotal', `₹${billTotal.toFixed(2)}`);
-    
+
     // Populate the NEW fields
     setText('receiptAmountReceived', `₹${amountReceived.toFixed(2)}`);
     setText('receiptBalanceDue', `₹${balanceDue.toFixed(2)}`);
@@ -1256,29 +1289,45 @@ forms.settle.addEventListener('submit', async function (e) {
         return;
     }
 
-    // Only update the original debtor/creditor as Settled, with new amount/type/date/desc if changed
-    const settleData = {
-        ...originalItem,
+    // 1. Mark the original debtor/creditor as Settled
+    const updatePayload = { ...originalItem, status: 'Settled' };
+
+    // 2. Create a new transaction for the settlement
+    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
+    const settlePaymentType = document.getElementById('settlePaymentType').value;
+    const transactionData = {
         date: document.getElementById('settleDate').value,
-        amount: parseFloat(document.getElementById('settleAmount').value) || 0,
-        payment_type: document.getElementById('settlePaymentType').value,
+        name: originalItem.name,
         description: document.getElementById('settleDescription').value,
-        status: 'Settled'
+        status: 'Done',
+        in_payments: [],
+        out_payments: []
     };
 
+    if (settleType === 'debtor') { // Money comes IN when a debtor pays you back
+        transactionData.in_payments.push({ amount: settleAmount, type: settlePaymentType });
+    } else { // Money goes OUT when you pay a creditor back
+        transactionData.out_payments.push({ amount: settleAmount, type: settlePaymentType });
+    }
+
     try {
-        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: settleData });
+        // Save both updates
+        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: updatePayload });
+        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: transactionData });
+
+        // Update local data
+        transactions.unshift(savedTx);
         if (settleType === 'debtor') {
-            debtors = debtors.map(d => d.id === editingId ? settleData : d);
+            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
         } else {
-            creditors = creditors.map(c => c.id === editingId ? settleData : c);
+            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
         }
-        renderDebtors();
-        renderCreditors();
-        makeStatements();
+
+        // Re-render everything
+        init();
         modals.settle.style.display = 'none';
-        resetSettleForm();
-        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
+        alert(`${settleType} settled successfully and a transaction was recorded.`);
+
     } catch (error) {
         console.error("Error settling debt:", error);
         alert('Failed to settle debt.');
@@ -1291,42 +1340,41 @@ forms.settle.addEventListener('submit', async function (e) {
 // =================================================================
 
 function updateTrendChart() {
-    const period = parseInt(document.getElementById('chartPeriod').value) || 30;
-    const dataType = document.getElementById('chartDataType').value || 'profit';
+    const period = parseInt(document.querySelector('.period-tab.active')?.dataset.period) || 7;
     const ctx = document.getElementById('trendChart').getContext('2d');
 
     // Prepare data
     const labels = [];
-    const dataPoints = [];
+    const incomeData = [];
+    const expenseData = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     for (let i = period - 1; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
-        labels.push(date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }));
+        labels.push(date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
-        let dayTotal = 0;
-        // This is a simplified calculation. You can make it more detailed.
-        if (dataType === 'income') {
-            transactions.forEach(tx => {
-                if (new Date(tx.date).toDateString() === date.toDateString()) {
-                    dayTotal += (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-                }
-            });
-        } else if (dataType === 'expense') {
-            expenses.forEach(ex => {
-                if (new Date(ex.date).toDateString() === date.toDateString()) {
-                    dayTotal += Number(ex.amount);
-                }
-            });
-        }
-        dataPoints.push(dayTotal);
-    }
+        // Calculate income for this day
+        let dayIncome = 0;
+        transactions.forEach(tx => {
+            if (new Date(tx.date).toDateString() === date.toDateString()) {
+                const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                dayIncome += (inTotal - outTotal); // Profit from transactions
+            }
+        });
 
-    // Destroy the old chart if it exists
-    if (trendChart) {
-        trendChart.destroy();
+        // Calculate expenses for this day
+        let dayExpense = 0;
+        expenses.forEach(ex => {
+            if (new Date(ex.date).toDateString() === date.toDateString()) {
+                dayExpense += Number(ex.amount);
+            }
+        });
+
+        incomeData.push(Math.max(0, dayIncome)); // Only positive profits count as income
+        expenseData.push(dayExpense);
     }
 
     // Create the new chart
@@ -1334,27 +1382,61 @@ function updateTrendChart() {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{
-                label: dataType.charAt(0).toUpperCase() + dataType.slice(1),
-                data: dataPoints,
-                borderColor: 'rgb(0, 150, 136)',
-                backgroundColor: 'rgba(0, 150, 136, 0.1)',
-                fill: true,
-                tension: 0.4,
-                borderWidth: 2
-            }]
+            datasets: [
+                {
+                    label: 'Income',
+                    data: incomeData,
+                    borderColor: '#4caf50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Expenses',
+                    data: expenseData,
+                    borderColor: '#f44336',
+                    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
             scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
                 }
             },
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    titleColor: '#333',
+                    bodyColor: '#666',
+                    borderColor: '#ddd',
+                    borderWidth: 1
                 }
             }
         }
@@ -1677,7 +1759,7 @@ function makeStatements() {
             }
         }
     });
-    
+
     // Transfers (for balance calculation)
     (transfers || []).forEach(tr => {
         const amount = Number(tr.amount) || 0;
@@ -1688,10 +1770,10 @@ function makeStatements() {
         if (toType === 'cash') cashBalance += amount;
         else if (tr.to) bankNameToBalance[tr.to] = (bankNameToBalance[tr.to] || 0) + amount;
     });
-    
+
     // Update balance stats
     if (stats.cash) stats.cash.textContent = cashBalance.toFixed(2);
-    
+
     // Calculate total bank balance from actual statements
     let totalBankBalance = 0;
     Object.keys(bankStatements).forEach(bankName => {
@@ -1701,13 +1783,13 @@ function makeStatements() {
         }, 0);
         totalBankBalance += bankBalance;
     });
-    
+
     if (stats.bank) stats.bank.textContent = totalBankBalance.toFixed(2);
 
     // Build and render statements (this logic remains the same)
     // ... [rest of the function for building cashStatements, bankStatements, etc.] ...
     // The rest of your makeStatements function for rendering tables should follow here.
-    
+
     const cashBalanceElem = document.getElementById('cashBalanceCash');
     if (cashBalanceElem) cashBalanceElem.textContent = cashBalance.toFixed(2);
 
@@ -1886,7 +1968,7 @@ function makeStatements() {
             const statementBalance = statements.reduce((total, entry) => {
                 return total + (Number(entry.in) || 0) - (Number(entry.out) || 0);
             }, 0);
-            
+
             return `<div class="bank-balance-item" data-bank="${bankName}" style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid #eee;cursor:pointer;">
                         <span>${bankName}</span>
                         <span>₹${statementBalance.toFixed(2)}</span>
@@ -1901,7 +1983,7 @@ function makeStatements() {
             renderBankStatement(bankName);
         };
     }
-    
+
     updateTrendChart();
     updateBankPieChart();
 }
@@ -2017,7 +2099,7 @@ forms.settle.addEventListener('submit', async function (e) {
 
     // 1. Mark the original debtor/creditor as Settled
     const updatePayload = { ...originalItem, status: 'Settled' };
-    
+
     // 2. Create a new transaction for the settlement
     const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
     const settlePaymentType = document.getElementById('settlePaymentType').value;

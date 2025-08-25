@@ -1266,6 +1266,24 @@ tr.settled-row:hover td {
         width: 100%;
     }
 
+    .charts-layout {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .trend-chart-section,
+    .pie-chart-section {
+        padding: 1rem;
+    }
+
+    #trendChartContainer {
+        height: 200px;
+    }
+
+    #bankPieChartContainer {
+        height: 250px;
+    }
+
     .top-header {
         grid-template-columns: auto 1fr auto;
         padding: 0.8rem;
@@ -1442,56 +1460,118 @@ tr.settled-row:hover td {
     font-size: 1rem;
 }
 
-/* Mini Trend Chart */
-#miniTrendChartContainer {
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    padding: 1rem;
-    max-width: 800px;
-    margin: 0 auto 1.5rem auto;
-    height: 120px;
+/* === CHARTS LAYOUT === */
+.charts-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin: 2rem 0;
 }
 
-#miniTrendChart {
-    width: 100% !important;
-    height: 100% !important;
-    display: block;
-}
-
-/* === BANK PIE CHART === */
-#bankPieChartContainer {
+.trend-chart-section,
+.pie-chart-section {
     background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     padding: 1.5rem;
-    max-width: 500px;
-    margin: 0 auto 2rem auto;
-    min-height: 350px;
 }
 
-#bankPieChart {
-    width: 100% !important;
-    height: 300px !important;
-    display: block;
-    margin: 0 auto;
+.trend-chart-section h3,
+.pie-chart-section h3 {
+    margin: 0 0 1rem 0;
+    color: #333;
+    font-size: 1.2rem;
+    font-weight: 600;
 }
 
-/* Trend Chart */
+/* Chart Period Tabs */
+.chart-period-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.period-tab {
+    background: #f5f5f5;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #666;
+}
+
+.period-tab.active {
+    background: var(--primary);
+    color: white;
+}
+
+.period-tab:hover {
+    background: #e0e0e0;
+}
+
+.period-tab.active:hover {
+    background: #00796b;
+}
+
+/* Chart Legend */
+.chart-legend {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.legend-item.income .legend-color {
+    background: #4caf50;
+}
+
+.legend-item.expense .legend-color {
+    background: #f44336;
+}
+
+/* Trend Chart Container */
 #trendChartContainer {
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    padding: 1rem;
-    max-width: 800px;
-    margin: 0 auto 1.5rem auto;
-    height: 120px;
+    position: relative;
+    height: 280px;
+    width: 100%;
 }
 
 #trendChart {
     width: 100% !important;
     height: 100% !important;
     display: block;
+}
+
+/* Pie Chart Container */
+#bankPieChartContainer {
+    position: relative;
+    height: 300px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#bankPieChart {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 280px;
+    max-height: 280px;
 }
 
 /* === BANK DATE FILTER === */
