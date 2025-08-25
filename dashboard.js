@@ -14,6 +14,14 @@ let categories = [];
 let cashStatements = [];
 let bankStatements = {};
 let balances = { cash: 0, bank: 0 };
+let profileData = {
+    name: 'Digital World',
+    phone: '7547034664',
+    email: 'support@digitalworld.com',
+    website: 'www.digitalworld.com',
+    address: 'Your Address Here',
+    image: 'pf.JPG'
+};
 let realtimeChannel;
 let trendChart, bankPieChart;
 
@@ -73,9 +81,15 @@ async function initializeDashboard(user) {
         creditors = allData.creditors || [];
         transfers = allData.transfers || [];
         banks = ['Bank (Generic)'].concat((allData.banks || []).map(b => b.name));
-
+        
+        // Load profile data
+        if (allData.profile && allData.profile.length > 0) {
+            profileData = { ...profileData, ...allData.profile[0] };
+        }
+        
         init(); // Call your original init function
         setupRealtimeListeners();
+        updateProfileDisplay();
     } catch (error) {
         console.error("Failed to initialize dashboard:", error);
         alert("Could not load your data. Please check the Vercel logs for a specific error message.");
@@ -117,7 +131,7 @@ const tabContents = { home: document.getElementById('tabHomeContent'), main: doc
 const stats = { income: document.getElementById('totalIncome'), expenses: document.getElementById('totalExpenses'), profit: document.getElementById('netProfit'), cash: document.getElementById('cashBalance'), bank: document.getElementById('bankBalance') };
 const tables = { transactionsBody: document.getElementById('transactionsBody'), expensesBody: document.getElementById('expensesBody'), debtorsBody: document.getElementById('debtorsBody'), creditorsBody: document.getElementById('creditorsBody'), cashStatementBody: document.getElementById('cashStatementBody') };
 const filters = { category: document.getElementById('filterCategory'), categoryList: document.getElementById('categoryList') };
-const modals = { transaction: document.getElementById('transactionFormModal'), expense: document.getElementById('expenseFormModal'), debtor: document.getElementById('debtorFormModal'), creditor: document.getElementById('creditorFormModal'),transfer: document.getElementById('transferFormModal'), receipt: document.getElementById('receiptModal'), banks: document.getElementById('banksModal'), settle: document.getElementById('settleModal') };
+const modals = { transaction: document.getElementById('transactionFormModal'), expense: document.getElementById('expenseFormModal'), debtor: document.getElementById('debtorFormModal'), creditor: document.getElementById('creditorFormModal'),transfer: document.getElementById('transferFormModal'), receipt: document.getElementById('receiptModal'), banks: document.getElementById('banksModal'), settle: document.getElementById('settleModal'), profile: document.getElementById('profileModal') };
 const buttons = {addTransfer: document.getElementById('addTransferBtn'), addExpense: document.getElementById('addExpenseBtn'), addDebtor: document.getElementById('addDebtorBtn'), addCreditor: document.getElementById('addCreditorBtn'), quickAddTrans: document.getElementById('quickAddTransBtn'), quickAddExpense: document.getElementById('quickAddExpenseBtn'), quickAddDebtor: document.getElementById('quickAddDebtorBtn'), quickAddCreditor: document.getElementById('quickAddCreditorBtn'), reset: document.getElementById('resetAllBtn'), printReceipt: document.getElementById('printReceiptBtn'), closeReceipt: document.getElementById('closeReceiptBtn'), manageBanks: document.getElementById('manageBanksBtn'), addBank: document.getElementById('addBankBtn'), deleteTransaction: document.getElementById('deleteTransactionBtn') };
 const forms = { transaction: document.getElementById('transactionForm'), expense: document.getElementById('expenseForm'), debtor: document.getElementById('debtorForm'), creditor: document.getElementById('creditorForm'),transfer: document.getElementById('transferForm'), settle: document.getElementById('settleForm') };
 const exportBtns = { transactions: document.getElementById('exportMainBtn'), expenses: document.getElementById('exportExpensesBtn'), debtors: document.getElementById('exportDebtorsBtn'), creditors: document.getElementById('exportCreditorsBtn'), account: document.getElementById('exportAccountBtn'), cash: document.getElementById('exportCashBtn') };
@@ -395,10 +409,85 @@ function init() {
     makeStatements();
     setupEventListeners();
     bindReceiptControls();
+    setupProfileEventListeners();
     // Your original event listener setups
     // Add these lines inside the init() function
     document.getElementById('chartPeriod').addEventListener('change', updateTrendChart);
     document.getElementById('chartDataType').addEventListener('change', updateTrendChart);
+}
+
+// Profile management functions
+function updateProfileDisplay() {
+    document.getElementById('profileName').textContent = profileData.name;
+    document.getElementById('profilePhone').textContent = profileData.phone;
+    document.getElementById('profileEmail').textContent = profileData.email;
+    document.getElementById('profileWebsite').textContent = profileData.website;
+    document.getElementById('profileAddress').textContent = profileData.address;
+    if (profileData.image) {
+        document.getElementById('profileImage').src = profileData.image;
+    }
+}
+
+function setupProfileEventListeners() {
+    const editProfileBtn = document.getElementById('editProfileBtn');
+    const profileForm = document.getElementById('profileForm');
+    const profileImageInput = document.getElementById('profileImageInput');
+    
+    if (editProfileBtn) {
+        editProfileBtn.addEventListener('click', () => {
+            // Populate form with current data
+            document.getElementById('profileNameInput').value = profileData.name;
+            document.getElementById('profilePhoneInput').value = profileData.phone;
+            document.getElementById('profileEmailInput').value = profileData.email;
+            document.getElementById('profileWebsiteInput').value = profileData.website;
+            document.getElementById('profileAddressInput').value = profileData.address;
+            showModal('profile');
+        });
+    }
+    
+    if (profileImageInput) {
+        profileImageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    profileData.image = e.target.result;
+                    document.getElementById('profileImage').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    
+    if (profileForm) {
+        profileForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const updatedProfile = {
+                name: document.getElementById('profileNameInput').value,
+                phone: document.getElementById('profilePhoneInput').value,
+                email: document.getElementById('profileEmailInput').value,
+                website: document.getElementById('profileWebsiteInput').value,
+                address: document.getElementById('profileAddressInput').value,
+                image: profileData.image
+            };
+            
+            try {
+                await apiCall('addOrUpdate', { table: 'profile', data: updatedProfile });
+                profileData = updatedProfile;
+                updateProfileDisplay();
+                document.getElementById('profileModal').style.display = 'none';
+                alert('Profile updated successfully!');
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                alert('Failed to update profile. Please try again.');
+            }
+        });
+    }
+}
+
+function getProfileData() {
+    return profileData;
 }
 
 // =================================================================
@@ -868,7 +957,7 @@ function showReceipt(type, data) {
 
     // --- Client and Receipt Meta Info ---
     setText('receiptClientName', data.name || data.category || 'N/A');
-    setText('receiptClientAddress', data.address || '');
+    setText('receiptClientAddress', data.address || profileData.address || '');
     setText('receiptClientPhone', data.phone || '');
     const dateObj = data.date ? new Date(data.date) : new Date();
     setText('receiptDate', dateObj.toLocaleString());
@@ -927,6 +1016,18 @@ function showReceipt(type, data) {
     // --- Update UI ---
     const itemsBody = document.getElementById('receiptItemsBody');
     if (itemsBody) itemsBody.innerHTML = itemsHtml;
+
+    // Populate business details from profile
+    setText('receiptBusinessName', profileData.name);
+    setText('receiptBusinessPhone', profileData.phone);
+    setText('receiptBusinessEmail', profileData.email);
+    setText('receiptBusinessWebsite', profileData.website);
+    setText('receiptBusinessAddress', profileData.address);
+    
+    const receiptLogo = document.getElementById('receiptLogo');
+    if (receiptLogo && profileData.image) {
+        receiptLogo.src = profileData.image;
+    }
 
     // Populate the totals section
     setText('receiptSubTotal', `₹${billTotal.toFixed(2)}`);

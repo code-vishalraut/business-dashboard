@@ -705,6 +705,125 @@ tr.settled-row:hover td {
     margin-bottom: 0.5rem;
 }
 
+/* === PROFILE SECTION === */
+.profile-section {
+    margin: 1.5rem 0;
+}
+
+.profile-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    position: relative;
+    border: 2px solid var(--primary);
+}
+
+.profile-image {
+    flex-shrink: 0;
+}
+
+.profile-image img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--primary);
+}
+
+.profile-info {
+    flex: 1;
+}
+
+.profile-info h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--primary);
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.profile-info p {
+    margin: 0.2rem 0;
+    color: #555;
+    font-size: 1rem;
+}
+
+.edit-profile-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.edit-profile-btn:hover {
+    background: #00796b;
+}
+
+/* Profile Modal Styles */
+#profileModal .modal-content {
+    max-width: 500px;
+}
+
+#profileForm .form-group {
+    margin-bottom: 1rem;
+}
+
+#profileForm label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+    color: #555;
+}
+
+#profileForm input,
+#profileForm textarea {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+#profileForm input:focus,
+#profileForm textarea:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 150, 136, 0.1);
+}
+
+#profileForm button[type="submit"] {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 1rem;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 1rem;
+    width: 100%;
+}
+
+#profileForm button[type="submit"]:hover {
+    background: #00796b;
+}
+
 /* === QUICK ACTIONS === */
 .quick-actions {
     display: flex;

@@ -70,6 +70,24 @@
             </div>
         </div>
 
+        <div class="profile-section">
+            <div class="profile-card" id="profileCard">
+                <div class="profile-image">
+                    <img src="pf.JPG" alt="Profile" id="profileImage">
+                </div>
+                <div class="profile-info">
+                    <h3 id="profileName">Digital World</h3>
+                    <p id="profilePhone">7547034664</p>
+                    <p id="profileEmail">support@digitalworld.com</p>
+                    <p id="profileWebsite">www.digitalworld.com</p>
+                    <p id="profileAddress">Your Address Here</p>
+                </div>
+                <button id="editProfileBtn" class="edit-profile-btn">
+                    <i class="fas fa-edit"></i> Edit Profile
+                </button>
+            </div>
+        </div>
+
         <div class="quick-actions">
             <button id="quickAddTransBtn"><i class="fas fa-exchange-alt"></i> Add Transaction</button>
             <button id="quickAddExpenseBtn"><i class="fas fa-receipt"></i> Add Expense</button>
@@ -284,13 +302,14 @@
                 <div class="receipt-body-v2">
                     <div class="receipt-header-v2">
                         <div class="receipt-logo-v2">
-                            <img src="pf.JPG" alt="Business Logo">
+                            <img id="receiptLogo" src="pf.JPG" alt="Business Logo">
                         </div>
                         <div class="receipt-store-details-v2">
-                            <h2>Digital World</h2>
-                            <p>Phone: 7547034664</p>
-                            <p>Email: support@digitalworld.com</p>
-                            <p>Web: www.digitalworld.com</p>
+                            <h2 id="receiptBusinessName">Digital World</h2>
+                            <p>Phone: <span id="receiptBusinessPhone">7547034664</span></p>
+                            <p>Email: <span id="receiptBusinessEmail">support@digitalworld.com</span></p>
+                            <p>Web: <span id="receiptBusinessWebsite">www.digitalworld.com</span></p>
+                            <p id="receiptBusinessAddress">Your Address Here</p>
                         </div>
                     </div>
                     <div class="receipt-title-v2">
@@ -474,6 +493,40 @@
                     <label>Description</label>
                     <input type="text" id="transferDesc" value="Transfer">
                     <button type="submit">💾 Save</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal" id="profileModal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2>Edit Profile</h2>
+                <form id="profileForm">
+                    <div class="form-group">
+                        <label>Profile Picture</label>
+                        <input type="file" id="profileImageInput" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label>Business Name</label>
+                        <input type="text" id="profileNameInput" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" id="profilePhoneInput" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="profileEmailInput" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Website</label>
+                        <input type="text" id="profileWebsiteInput">
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <textarea id="profileAddressInput" rows="3"></textarea>
+                    </div>
+                    <button type="submit">💾 Save Profile</button>
                 </form>
             </div>
         </div>
