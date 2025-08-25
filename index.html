@@ -97,10 +97,17 @@
             <div class="charts-layout">
                 <div class="trend-chart-section">
                     <h3>Financial Trends</h3>
-                    <div class="chart-period-tabs">
-                        <button class="period-tab active" data-period="7">7 Days</button>
-                        <button class="period-tab" data-period="15">15 Days</button>
-                        <button class="period-tab" data-period="30">30 Days</button>
+                    <div class="chart-controls">
+                        <div class="chart-period-tabs">
+                            <button class="period-tab active" data-period="7">7 Days</button>
+                            <button class="period-tab" data-period="15">15 Days</button>
+                            <button class="period-tab" data-period="30">30 Days</button>
+                        </div>
+                        <select id="chartDataType">
+                            <option value="income">Income vs Expenses</option>
+                            <option value="cash">Cash Flow</option>
+                            <option value="bank">Bank Activity</option>
+                        </select>
                     </div>
                     <div class="chart-legend">
                         <span class="legend-item income"><span class="legend-color"></span>Income</span>

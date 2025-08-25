@@ -3,7 +3,7 @@
 // =================================================================
 const SUPABASE_URL = 'https://clcqdjmfkkvqzxcjbvdm.supabase.co';
 // !!! IMPORTANT: PASTE YOUR 'anon public' KEY FROM YOUR SUPABASE PROJECT HERE !!!
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsY3Fkam1ma2t2cXp4Y2pidmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MTY4MDEsImV4cCI6MjA3MDM5MjgwMX0.C57KA-Ck1YPckr49pH3hfH4fJ5bNzklkINaeseGOFAE';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOnN1cGFiYXNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MTY4MDEsImV4cCI6MjA3MDM5MjgwMX0.C57KA-Ck1YPckr49pH3hfH4fJ5bNzklkINaeseGOFAE';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -497,12 +497,22 @@ function getProfileData() {
 
 function updateTrendChart() {
     const period = parseInt(document.querySelector('.period-tab.active')?.dataset.period) || 7;
-    const ctx = document.getElementById('trendChart').getContext('2d');
+    const chartCanvas = document.getElementById('trendChart');
+    if (!chartCanvas) return;
+
+    // Destroy existing chart if it exists
+    if (trendChart) {
+        trendChart.destroy();
+        trendChart = null;
+    }
+
+    const ctx = chartCanvas.getContext('2d');
+    const dataType = document.getElementById('chartDataType')?.value || 'income';
 
     // Prepare data
     const labels = [];
-    const incomeData = [];
-    const expenseData = [];
+    const dataset1Data = [];
+    const dataset2Data = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -511,26 +521,86 @@ function updateTrendChart() {
         date.setDate(today.getDate() - i);
         labels.push(date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
-        // Calculate income for this day
-        let dayIncome = 0;
-        transactions.forEach(tx => {
-            if (new Date(tx.date).toDateString() === date.toDateString()) {
-                const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-                const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-                dayIncome += (inTotal - outTotal); // Profit from transactions
-            }
-        });
+        if (dataType === 'income') {
+            // Calculate income vs expenses
+            let dayIncome = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    dayIncome += (inTotal - outTotal);
+                }
+            });
 
-        // Calculate expenses for this day
-        let dayExpense = 0;
-        expenses.forEach(ex => {
-            if (new Date(ex.date).toDateString() === date.toDateString()) {
-                dayExpense += Number(ex.amount);
-            }
-        });
+            let dayExpense = 0;
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    dayExpense += Number(ex.amount);
+                }
+            });
 
-        incomeData.push(Math.max(0, dayIncome)); // Only positive profits count as income
-        expenseData.push(dayExpense);
+            dataset1Data.push(Math.max(0, dayIncome));
+            dataset2Data.push(dayExpense);
+        } else if (dataType === 'cash') {
+            // Calculate cash in vs cash out
+            let cashIn = 0, cashOut = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    (tx.in_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() === 'cash') cashIn += Number(p.amount);
+                    });
+                    (tx.out_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() === 'cash') cashOut += Number(p.amount);
+                    });
+                }
+            });
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    if ((ex.payment_type || '').toLowerCase() === 'cash') {
+                        cashOut += Number(ex.amount);
+                    }
+                }
+            });
+
+            dataset1Data.push(cashIn);
+            dataset2Data.push(cashOut);
+        } else if (dataType === 'bank') {
+            // Calculate bank in vs bank out
+            let bankIn = 0, bankOut = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    (tx.in_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() !== 'cash') bankIn += Number(p.amount);
+                    });
+                    (tx.out_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() !== 'cash') bankOut += Number(p.amount);
+                    });
+                }
+            });
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    if ((ex.payment_type || '').toLowerCase() !== 'cash') {
+                        bankOut += Number(ex.amount);
+                    }
+                }
+            });
+
+            dataset1Data.push(bankIn);
+            dataset2Data.push(bankOut);
+        }
+    }
+
+    // Set labels and colors based on data type
+    let label1, label2, color1, color2;
+    if (dataType === 'income') {
+        label1 = 'Income'; label2 = 'Expenses';
+        color1 = '#4caf50'; color2 = '#f44336';
+    } else if (dataType === 'cash') {
+        label1 = 'Cash In'; label2 = 'Cash Out';
+        color1 = '#2196f3'; color2 = '#ff9800';
+    } else {
+        label1 = 'Bank In'; label2 = 'Bank Out';
+        color1 = '#9c27b0'; color2 = '#607d8b';
     }
 
     // Create the new chart
@@ -540,10 +610,10 @@ function updateTrendChart() {
             labels: labels,
             datasets: [
                 {
-                    label: 'Income',
-                    data: incomeData,
-                    borderColor: '#4caf50',
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    label: label1,
+                    data: dataset1Data,
+                    borderColor: color1,
+                    backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
                     fill: true,
                     tension: 0.4,
                     borderWidth: 3,
@@ -551,10 +621,10 @@ function updateTrendChart() {
                     pointHoverRadius: 6
                 },
                 {
-                    label: 'Expenses',
-                    data: expenseData,
-                    borderColor: '#f44336',
-                    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                    label: label2,
+                    data: dataset2Data,
+                    borderColor: color2,
+                    backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
                     fill: true,
                     tension: 0.4,
                     borderWidth: 3,
@@ -600,7 +670,16 @@ function updateTrendChart() {
 }
 
 function updateBankPieChart() {
-    const ctx = document.getElementById('bankPieChart').getContext('2d');
+    const chartCanvas = document.getElementById('bankPieChart');
+    if (!chartCanvas) return;
+
+    // Destroy existing chart if it exists
+    if (bankPieChart) {
+        bankPieChart.destroy();
+        bankPieChart = null;
+    }
+
+    const ctx = chartCanvas.getContext('2d');
     const bankBalances = {};
 
     // Calculate balances from transactions
@@ -633,10 +712,6 @@ function updateBankPieChart() {
 
     const labels = Object.keys(bankBalances);
     const data = Object.values(bankBalances);
-
-    if (bankPieChart) {
-        bankPieChart.destroy();
-    }
 
     bankPieChart = new Chart(ctx, {
         type: 'pie',
@@ -1341,12 +1416,22 @@ forms.settle.addEventListener('submit', async function (e) {
 
 function updateTrendChart() {
     const period = parseInt(document.querySelector('.period-tab.active')?.dataset.period) || 7;
-    const ctx = document.getElementById('trendChart').getContext('2d');
+    const chartCanvas = document.getElementById('trendChart');
+    if (!chartCanvas) return;
+
+    // Destroy existing chart if it exists
+    if (trendChart) {
+        trendChart.destroy();
+        trendChart = null;
+    }
+
+    const ctx = chartCanvas.getContext('2d');
+    const dataType = document.getElementById('chartDataType')?.value || 'income';
 
     // Prepare data
     const labels = [];
-    const incomeData = [];
-    const expenseData = [];
+    const dataset1Data = [];
+    const dataset2Data = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -1355,26 +1440,86 @@ function updateTrendChart() {
         date.setDate(today.getDate() - i);
         labels.push(date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
-        // Calculate income for this day
-        let dayIncome = 0;
-        transactions.forEach(tx => {
-            if (new Date(tx.date).toDateString() === date.toDateString()) {
-                const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-                const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-                dayIncome += (inTotal - outTotal); // Profit from transactions
-            }
-        });
+        if (dataType === 'income') {
+            // Calculate income vs expenses
+            let dayIncome = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    dayIncome += (inTotal - outTotal);
+                }
+            });
 
-        // Calculate expenses for this day
-        let dayExpense = 0;
-        expenses.forEach(ex => {
-            if (new Date(ex.date).toDateString() === date.toDateString()) {
-                dayExpense += Number(ex.amount);
-            }
-        });
+            let dayExpense = 0;
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    dayExpense += Number(ex.amount);
+                }
+            });
 
-        incomeData.push(Math.max(0, dayIncome)); // Only positive profits count as income
-        expenseData.push(dayExpense);
+            dataset1Data.push(Math.max(0, dayIncome));
+            dataset2Data.push(dayExpense);
+        } else if (dataType === 'cash') {
+            // Calculate cash in vs cash out
+            let cashIn = 0, cashOut = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    (tx.in_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() === 'cash') cashIn += Number(p.amount);
+                    });
+                    (tx.out_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() === 'cash') cashOut += Number(p.amount);
+                    });
+                }
+            });
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    if ((ex.payment_type || '').toLowerCase() === 'cash') {
+                        cashOut += Number(ex.amount);
+                    }
+                }
+            });
+
+            dataset1Data.push(cashIn);
+            dataset2Data.push(cashOut);
+        } else if (dataType === 'bank') {
+            // Calculate bank in vs bank out
+            let bankIn = 0, bankOut = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    (tx.in_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() !== 'cash') bankIn += Number(p.amount);
+                    });
+                    (tx.out_payments || []).forEach(p => {
+                        if (p.type.toLowerCase() !== 'cash') bankOut += Number(p.amount);
+                    });
+                }
+            });
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    if ((ex.payment_type || '').toLowerCase() !== 'cash') {
+                        bankOut += Number(ex.amount);
+                    }
+                }
+            });
+
+            dataset1Data.push(bankIn);
+            dataset2Data.push(bankOut);
+        }
+    }
+
+    // Set labels and colors based on data type
+    let label1, label2, color1, color2;
+    if (dataType === 'income') {
+        label1 = 'Income'; label2 = 'Expenses';
+        color1 = '#4caf50'; color2 = '#f44336';
+    } else if (dataType === 'cash') {
+        label1 = 'Cash In'; label2 = 'Cash Out';
+        color1 = '#2196f3'; color2 = '#ff9800';
+    } else {
+        label1 = 'Bank In'; label2 = 'Bank Out';
+        color1 = '#9c27b0'; color2 = '#607d8b';
     }
 
     // Create the new chart
@@ -1384,10 +1529,10 @@ function updateTrendChart() {
             labels: labels,
             datasets: [
                 {
-                    label: 'Income',
-                    data: incomeData,
-                    borderColor: '#4caf50',
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    label: label1,
+                    data: dataset1Data,
+                    borderColor: color1,
+                    backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
                     fill: true,
                     tension: 0.4,
                     borderWidth: 3,
@@ -1395,10 +1540,10 @@ function updateTrendChart() {
                     pointHoverRadius: 6
                 },
                 {
-                    label: 'Expenses',
-                    data: expenseData,
-                    borderColor: '#f44336',
-                    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                    label: label2,
+                    data: dataset2Data,
+                    borderColor: color2,
+                    backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
                     fill: true,
                     tension: 0.4,
                     borderWidth: 3,
@@ -1444,7 +1589,16 @@ function updateTrendChart() {
 }
 
 function updateBankPieChart() {
-    const ctx = document.getElementById('bankPieChart').getContext('2d');
+    const chartCanvas = document.getElementById('bankPieChart');
+    if (!chartCanvas) return;
+
+    // Destroy existing chart if it exists
+    if (bankPieChart) {
+        bankPieChart.destroy();
+        bankPieChart = null;
+    }
+
+    const ctx = chartCanvas.getContext('2d');
     const bankBalances = {};
 
     // Calculate balances from transactions
@@ -1477,10 +1631,6 @@ function updateBankPieChart() {
 
     const labels = Object.keys(bankBalances);
     const data = Object.values(bankBalances);
-
-    if (bankPieChart) {
-        bankPieChart.destroy();
-    }
 
     bankPieChart = new Chart(ctx, {
         type: 'pie',
@@ -2141,8 +2291,6 @@ forms.settle.addEventListener('submit', async function (e) {
         alert('Failed to settle debt.');
     }
 });
-
-
 
 
 // === AI Assistant Minimize/Maximize ===
