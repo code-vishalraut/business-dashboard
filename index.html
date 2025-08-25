@@ -28,14 +28,19 @@
     </div>
 
     <div class="page-wrapper" id="dashboard-wrapper" style="display: none;">
-            
-        </div>
-            <div class="profile-image">
-                <img src="pf.JPG" alt="Profile" id="profileImage">
+        <div class="top-header">
+            <div class="top-header-left">
+                <div class="profile-image">
+                    <img src="pf.JPG" alt="Profile" id="profileImage">
+                </div>
             </div>
-            <span id="welcome-message" style="font-weight: bold;"></span>
-            <h1 id="profileName">Digital World</h1>
-            <button id="logoutBtn"style="padding: 8px 12px; background-color: #DC3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Logout</button>
+            <div class="top-header-center">
+                <div class="welcome-message" id="welcome-message"></div>
+                <div class="business-title" id="profileName">Digital World</div>
+            </div>
+            <div class="top-header-right">
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+            </div>
         </div>
 
         <div class="dashboard-stats-container">

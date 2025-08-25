@@ -430,7 +430,7 @@ function updateProfileDisplay() {
 }
 
 function setupProfileEventListeners() {
-    const profileHeader = document.getElementById('profileHeader');
+    const profileHeader = document.querySelector('.top-header-center');
     const profileForm = document.getElementById('profileForm');
     const profileImageInput = document.getElementById('profileImageInput');
     
