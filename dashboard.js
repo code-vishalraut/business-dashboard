@@ -166,12 +166,21 @@ let bankStatementFilter = { from: null, to: null };
 function openTab(tabName) {
     Object.values(tabContents).forEach(content => content.classList.remove('active'));
     Object.values(tabs).forEach(tab => tab.classList.remove('active'));
-    tabContents[tabName].classList.add('active');
-    tabs[tabName].classList.add('active');
+    
+    if (tabContents[tabName]) tabContents[tabName].classList.add('active');
+    if (tabs[tabName]) tabs[tabName].classList.add('active');
 }
-Object.entries(tabs).forEach(([name, tab]) => {
-    if (tab) tab.addEventListener('click', () => openTab(name));
-});
+
+// Setup tab event listeners
+function setupTabEventListeners() {
+    Object.entries(tabs).forEach(([name, tab]) => {
+        if (tab) {
+            tab.addEventListener('click', () => {
+                openTab(name);
+            });
+        }
+    });
+}
 
 // --- Modals ---
 function showModal(modalName) {
@@ -427,6 +436,7 @@ if (forms.transfer) {
 // Your original init function, now called by the new logic
 function init() {
     updatePaymentTypeOptions();
+    setupTabEventListeners();
     // Your original rendering calls
     renderCategoryFilter();
     renderTransactions();
@@ -467,27 +477,17 @@ function init() {
         });
     }
 
-    // Tab functionality with null checks
-    const tabs = document.querySelectorAll('.tab');
-    if (tabs) {
-        tabs.forEach(tab => {
-            if (tab) {
-                tab.addEventListener('click', () => {
-                    // Remove active class from all tabs and contents
-                    const allTabs = document.querySelectorAll('.tab');
-                    const allTabContents = document.querySelectorAll('.tab-content');
+    // Form submissions with null checks
+    // Transaction form is already handled above in the code
 
-                    if (allTabs) allTabs.forEach(t => t.classList.remove('active'));
-                    if (allTabContents) allTabContents.forEach(tc => tc.classList.remove('active'));
+    // Form submissions are already handled above in the code with their own event listeners
 
-                    // Add active class to clicked tab and corresponding content
-                    tab.classList.add('active');
-                    const targetContent = document.getElementById(tab.dataset.tab);
-                    if (targetContent) targetContent.classList.add('active');
-                });
-            }
-        });
-    }
+    // Settle and profile forms are already handled above in the code
+
+    // Button handlers with null checks
+    // Button handlers are already set up above in the code
+
+    // Tab functionality is handled by setupTabEventListeners()
 }
 
 // Profile management functions
