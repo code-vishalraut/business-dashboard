@@ -896,6 +896,15 @@ tr.settled-row:hover td {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex: 1;
+    min-width: 200px;
+    max-width: 250px;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.quick-actions button:hover {
+    background: #00796b;
 }
 
 .quick-actions button i {
@@ -1280,7 +1289,6 @@ tr.settled-row:hover td {
         padding: 6px 12px;
         font-size: 0.9rem;
     }
-}
 
     .desktop-view th,
     .desktop-view td {
@@ -1294,20 +1302,33 @@ tr.settled-row:hover td {
         padding: 0.5rem 0.8rem;
     }
 
+    .quick-actions {
+        flex-direction: column;
+    }
+
     .quick-actions button {
         width: 100%;
+        max-width: none;
+        min-width: auto;
     }
 
+    #miniTrendChartContainer,
     #trendChartContainer {
         max-width: 100%;
-        padding: 0.5rem;
+        padding: 0.8rem;
+        height: 100px;
     }
 
-    #trendChart {
+    #bankPieChartContainer {
         max-width: 100%;
-        height: 40px;
+        padding: 1rem;
+        min-height: 300px;
     }
 
+    #bankPieChart {
+        height: 250px !important;
+    }
+}
 
 /* === MOBILE FRIENDLY FORMS === */
 @media (max-width: 480px) {
@@ -1427,16 +1448,15 @@ tr.settled-row:hover td {
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     padding: 1rem;
-    max-width: 600px;
+    max-width: 800px;
     margin: 0 auto 1.5rem auto;
+    height: 120px;
 }
 
 #miniTrendChart {
-    width: 100%;
-    max-width: 580px;
-    height: 60px;
+    width: 100% !important;
+    height: 100% !important;
     display: block;
-    margin: 0 auto;
 }
 
 /* === BANK PIE CHART === */
@@ -1444,18 +1464,34 @@ tr.settled-row:hover td {
     background: #fff;
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    padding: 1rem;
-    max-width: 480px;
+    padding: 1.5rem;
+    max-width: 500px;
     margin: 0 auto 2rem auto;
-    height: 400px; /* fixed container height */
+    min-height: 350px;
 }
 
 #bankPieChart {
     width: 100% !important;
-    max-width: 440px;
-    height: 100% !important; /* occupy full container */
+    height: 300px !important;
     display: block;
     margin: 0 auto;
+}
+
+/* Trend Chart */
+#trendChartContainer {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    max-width: 800px;
+    margin: 0 auto 1.5rem auto;
+    height: 120px;
+}
+
+#trendChart {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
 }
 
 /* === BANK DATE FILTER === */
