@@ -496,8 +496,7 @@ function getProfileData() {
 // =================================================================
 
 function updateTrendChart() {
-    const activePeriodTab = document.querySelector('.period-tab.active');
-    const period = activePeriodTab ? parseInt(activePeriodTab.dataset.period) || 7 : 7;
+    const period = parseInt(document.querySelector('.period-tab.active')?.dataset.period) || 7;
     const chartCanvas = document.getElementById('trendChart');
     if (!chartCanvas) return;
 
@@ -1411,24 +1410,12 @@ forms.settle.addEventListener('submit', async function (e) {
 });
 
 
-// === AI Assistant Minimize/Maximize ===
-function toggleAIChat() {
-    const aiBox = document.getElementById('aiAssistant');
-    if (!aiBox) return;
-    aiBox.classList.toggle('minimized');
-    // Change icon
-    const icon = document.getElementById('aiToggleIcon');
-    if (icon) {
-        icon.textContent = aiBox.classList.contains('minimized') ? '+' : '−';
-    }
-}
 // =================================================================
 // ADDED: Minimal implementations for missing functions
 // =================================================================
 
 function updateTrendChart() {
-    const activePeriodTab = document.querySelector('.period-tab.active');
-    const period = activePeriodTab ? parseInt(activePeriodTab.dataset.period) || 7 : 7;
+    const period = parseInt(document.querySelector('.period-tab.active')?.dataset.period) || 7;
     const chartCanvas = document.getElementById('trendChart');
     if (!chartCanvas) return;
 
@@ -1797,7 +1784,7 @@ function renderCreditors() {
     });
 }
 
-// Debtors and Creditors settle modal reset
+// Debtor and Creditor settle modal reset
 function resetSettleForm() {
     const form = forms.settle;
     if (!form) return;
