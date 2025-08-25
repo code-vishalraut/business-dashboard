@@ -61,8 +61,8 @@ logoutBtn.addEventListener('click', async () => {
 
 supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || !session) {
-        dashboardWrapper.style.display = 'none';
-        authContainer.style.display = 'flex';
+        if (dashboardWrapper) dashboardWrapper.style.display = 'none';
+        if (authContainer) authContainer.style.display = 'flex';
         if (realtimeChannel) supabase.removeChannel(realtimeChannel);
     } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session.user) initializeDashboard(session.user);
@@ -71,8 +71,8 @@ supabase.auth.onAuthStateChange((event, session) => {
 
 async function initializeDashboard(user) {
     document.getElementById('welcome-message').textContent = `Welcome, ${user.email}`;
-    authContainer.style.display = 'none';
-    dashboardWrapper.style.display = 'block';
+    if (authContainer) authContainer.style.display = 'none';
+    if (dashboardWrapper) dashboardWrapper.style.display = 'block';
     try {
         const allData = await apiCall('fetchAll');
         transactions = allData.transactions || [];
@@ -125,13 +125,38 @@ function setupRealtimeListeners() {
 // NOTE: The PIN login function is removed as it's replaced by Supabase login.
 // NOTE: All 'localStorage.setItem' and 'localStorage.getItem' calls are removed.
 
-// DOM elements
+// Global variables and element references with null checks
 const tabs = { home: document.getElementById('tabHome'), main: document.getElementById('tabMain'), expenses: document.getElementById('tabExpenses'), debtors: document.getElementById('tabDebtors'), creditors: document.getElementById('tabCreditors'), account: document.getElementById('tabAccount'), cash: document.getElementById('tabCash'), export: document.getElementById('tabExport') };
 const tabContents = { home: document.getElementById('tabHomeContent'), main: document.getElementById('tabMainContent'), expenses: document.getElementById('tabExpensesContent'), debtors: document.getElementById('tabDebtorsContent'), creditors: document.getElementById('tabCreditorsContent'), account: document.getElementById('tabAccountContent'), cash: document.getElementById('tabCashContent'), export: document.getElementById('tabExportContent') };
-const stats = { income: document.getElementById('totalIncome'), expenses: document.getElementById('totalExpenses'), profit: document.getElementById('netProfit'), cash: document.getElementById('cashBalance'), bank: document.getElementById('bankBalance') };
-const tables = { transactionsBody: document.getElementById('transactionsBody'), expensesBody: document.getElementById('expensesBody'), debtorsBody: document.getElementById('debtorsBody'), creditorsBody: document.getElementById('creditorsBody'), cashStatementBody: document.getElementById('cashStatementBody') };
-const filters = { category: document.getElementById('filterCategory'), categoryList: document.getElementById('categoryList') };
-const modals = { transaction: document.getElementById('transactionFormModal'), expense: document.getElementById('expenseFormModal'), debtor: document.getElementById('debtorFormModal'), creditor: document.getElementById('creditorFormModal'),transfer: document.getElementById('transferFormModal'), receipt: document.getElementById('receiptModal'), banks: document.getElementById('banksModal'), settle: document.getElementById('settleModal'), profile: document.getElementById('profileModal') };
+const stats = { 
+    income: document.getElementById('totalIncome'), 
+    expenses: document.getElementById('totalExpenses'), 
+    profit: document.getElementById('netProfit'), 
+    cash: document.getElementById('cashBalance'), 
+    bank: document.getElementById('bankBalance') 
+};
+const tables = { 
+    transactionsBody: document.getElementById('transactionsBody'), 
+    expensesBody: document.getElementById('expensesBody'), 
+    debtorsBody: document.getElementById('debtorsBody'), 
+    creditorsBody: document.getElementById('creditorsBody'), 
+    cashStatementBody: document.getElementById('cashStatementBody') 
+};
+const filters = { 
+    category: document.getElementById('filterCategory'), 
+    categoryList: document.getElementById('categoryList') 
+};
+const modals = { 
+    transaction: document.getElementById('transactionFormModal'), 
+    expense: document.getElementById('expenseFormModal'), 
+    debtor: document.getElementById('debtorFormModal'), 
+    creditor: document.getElementById('creditorFormModal'),
+    transfer: document.getElementById('transferFormModal'), 
+    receipt: document.getElementById('receiptModal'), 
+    banks: document.getElementById('banksModal'), 
+    settle: document.getElementById('settleModal'), 
+    profile: document.getElementById('profileModal') 
+};
 const buttons = {addTransfer: document.getElementById('addTransferBtn'), addExpense: document.getElementById('addExpenseBtn'), addDebtor: document.getElementById('addDebtorBtn'), addCreditor: document.getElementById('addCreditorBtn'), quickAddTrans: document.getElementById('quickAddTransBtn'), quickAddExpense: document.getElementById('quickAddExpenseBtn'), quickAddDebtor: document.getElementById('quickAddDebtorBtn'), quickAddCreditor: document.getElementById('quickAddCreditorBtn'), reset: document.getElementById('resetAllBtn'), printReceipt: document.getElementById('printReceiptBtn'), closeReceipt: document.getElementById('closeReceiptBtn'), manageBanks: document.getElementById('manageBanksBtn'), addBank: document.getElementById('addBankBtn'), deleteTransaction: document.getElementById('deleteTransactionBtn') };
 const forms = { transaction: document.getElementById('transactionForm'), expense: document.getElementById('expenseForm'), debtor: document.getElementById('debtorForm'), creditor: document.getElementById('creditorForm'),transfer: document.getElementById('transferForm'), settle: document.getElementById('settleForm') };
 const exportBtns = { transactions: document.getElementById('exportMainBtn'), expenses: document.getElementById('exportExpensesBtn'), debtors: document.getElementById('exportDebtorsBtn'), creditors: document.getElementById('exportCreditorsBtn'), account: document.getElementById('exportAccountBtn'), cash: document.getElementById('exportCashBtn') };
@@ -145,7 +170,7 @@ function openTab(tabName) {
     tabs[tabName].classList.add('active');
 }
 Object.entries(tabs).forEach(([name, tab]) => {
-    tab.addEventListener('click', () => openTab(name));
+    if (tab) tab.addEventListener('click', () => openTab(name));
 });
 
 // --- Modals ---
@@ -153,13 +178,15 @@ function showModal(modalName) {
     if (modals[modalName]) modals[modalName].style.display = 'flex';
 }
 document.querySelectorAll('.modal .close-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const modal = e.target.closest('.modal');
-        if (modal) {
-            modal.style.display = 'none';
-            if (modal.id === 'transactionFormModal') resetTransactionForm();
-        }
-    });
+    if (btn) {
+        btn.addEventListener('click', (e) => {
+            const modal = e.target.closest('.modal');
+            if (modal) {
+                modal.style.display = 'none';
+                if (modal.id === 'transactionFormModal') resetTransactionForm();
+            }
+        });
+    }
 });
 
 // --- Open Form Modals (Add buttons) ---
@@ -412,8 +439,90 @@ function init() {
     setupProfileEventListeners();
     // Your original event listener setups
     // Add these lines inside the init() function
-    document.getElementById('chartPeriod').addEventListener('change', updateTrendChart);
-    document.getElementById('chartDataType').addEventListener('change', updateTrendChart);
+    const chartPeriod = document.getElementById('chartPeriod');
+    if (chartPeriod) chartPeriod.addEventListener('change', updateTrendChart);
+    const chartDataType = document.getElementById('chartDataType');
+    if (chartDataType) chartDataType.addEventListener('change', updateTrendChart);
+
+    // Close modal handlers with null checks
+    const { transaction, expense, debtor, creditor, transfer, receipt, banks, settle, profile } = modals;
+    [transaction, expense, debtor, creditor, transfer, receipt, banks, settle, profile].forEach(modal => {
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            });
+        }
+    });
+
+    // Close button handlers with null checks
+    const closeBtns = document.querySelectorAll('.close-btn');
+    if (closeBtns) {
+        closeBtns.forEach(btn => {
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    const modal = e.target.closest('.modal');
+                    if (modal) modal.style.display = 'none';
+                });
+            }
+        });
+    }
+
+    // Form submissions with null checks
+    const transactionForm = document.getElementById('transactionForm');
+    if (transactionForm) transactionForm.addEventListener('submit', saveTransaction);
+
+    const expenseForm = document.getElementById('expenseForm');
+    if (expenseForm) expenseForm.addEventListener('submit', saveExpense);
+
+    const debtorForm = document.getElementById('debtorForm');
+    if (debtorForm) debtorForm.addEventListener('submit', saveDebtor);
+
+    const creditorForm = document.getElementById('creditorForm');
+    if (creditorForm) creditorForm.addEventListener('submit', saveCreditor);
+
+    const transferForm = document.getElementById('transferForm');
+    if (transferForm) transferForm.addEventListener('submit', saveTransfer);
+
+    const settleForm = document.getElementById('settleForm');
+    if (settleForm) settleForm.addEventListener('submit', processSettle);
+
+    const profileForm = document.getElementById('profileForm');
+    if (profileForm) profileForm.addEventListener('submit', saveProfile);
+
+    // Button handlers with null checks
+    const resetAllBtn = document.getElementById('resetAllBtn');
+    if (resetAllBtn) resetAllBtn.addEventListener('click', handleResetAll);
+
+    const addBankBtn = document.getElementById('addBankBtn');
+    if (addBankBtn) addBankBtn.addEventListener('click', addBank);
+
+    const deleteTransactionBtn = document.getElementById('deleteTransactionBtn');
+    if (deleteTransactionBtn) deleteTransactionBtn.addEventListener('click', deleteTransaction);
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+
+    // Tab functionality with null checks
+    const tabs = document.querySelectorAll('.tab');
+    if (tabs) {
+        tabs.forEach(tab => {
+            if (tab) {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and contents
+                    const allTabs = document.querySelectorAll('.tab');
+                    const allTabContents = document.querySelectorAll('.tab-content');
+
+                    if (allTabs) allTabs.forEach(t => t.classList.remove('active'));
+                    if (allTabContents) allTabContents.forEach(tc => tc.classList.remove('active'));
+
+                    // Add active class to clicked tab and corresponding content
+                    tab.classList.add('active');
+                    const targetContent = document.getElementById(tab.dataset.tab);
+                    if (targetContent) targetContent.classList.add('active');
+                });
+            }
+        });
+    }
 }
 
 // Profile management functions
@@ -2296,7 +2405,7 @@ forms.settle.addEventListener('submit', async function (e) {
 
         // Re-render everything
         init();
-        modals.settle.style.display = 'none';
+        if (modals.settle) modals.settle.style.display = 'none';
         alert(`${settleType} settled successfully and a transaction was recorded.`);
 
     } catch (error) {
