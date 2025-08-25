@@ -418,13 +418,14 @@ function init() {
 
 // Profile management functions
 function updateProfileDisplay() {
-    document.getElementById('profileName').textContent = profileData.name;
-    document.getElementById('profilePhone').textContent = profileData.phone;
-    document.getElementById('profileEmail').textContent = profileData.email;
-    document.getElementById('profileWebsite').textContent = profileData.website;
-    document.getElementById('profileAddress').textContent = profileData.address;
-    if (profileData.image) {
-        document.getElementById('profileImage').src = profileData.image;
+    const nameElement = document.getElementById('profileName');
+    const imageElement = document.getElementById('profileImage');
+    
+    if (nameElement) {
+        nameElement.textContent = profileData.name;
+    }
+    if (imageElement && profileData.image) {
+        imageElement.src = profileData.image;
     }
 }
 
