@@ -400,7 +400,6 @@ if (forms.transfer) {
 // Your original init function, now called by the new logic
 function init() {
     updatePaymentTypeOptions();
-    // Your original rendering calls
     renderCategoryFilter();
     renderTransactions();
     renderExpenses();
@@ -410,10 +409,16 @@ function init() {
     setupEventListeners();
     bindReceiptControls();
     setupProfileEventListeners();
-    // Your original event listener setups
-    // Add these lines inside the init() function
-    document.getElementById('chartPeriod').addEventListener('change', updateTrendChart);
-    document.getElementById('chartDataType').addEventListener('change', updateTrendChart);
+
+    // Fix: Only add event listeners if elements exist
+    const chartPeriodElem = document.getElementById('chartPeriod');
+    if (chartPeriodElem) {
+        chartPeriodElem.addEventListener('change', updateTrendChart);
+    }
+    const chartDataTypeElem = document.getElementById('chartDataType');
+    if (chartDataTypeElem) {
+        chartDataTypeElem.addEventListener('change', updateTrendChart);
+    }
 }
 
 // Profile management functions
