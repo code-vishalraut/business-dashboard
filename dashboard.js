@@ -1141,7 +1141,7 @@ function showReceipt(type, data) {
 
     // --- Client and Receipt Meta Info ---
     setText('receiptClientName', data.name || data.category || 'N/A');
-    setText('receiptClientAddress', data.address || profileData.address || '');
+    setText('receiptClientAddress', data.address || '');
     setText('receiptClientPhone', data.phone || '');
     const dateObj = data.date ? new Date(data.date) : new Date();
     setText('receiptDate', dateObj.toLocaleString());
