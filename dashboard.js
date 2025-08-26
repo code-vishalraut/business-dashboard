@@ -576,7 +576,6 @@ function updateTrendChart() {
     const chartCanvas = document.getElementById('trendChart');
     if (!chartCanvas) return;
 
-    // Destroy existing chart if it exists
     if (trendChart) {
         trendChart.destroy();
         trendChart = null;
@@ -585,7 +584,6 @@ function updateTrendChart() {
     const ctx = chartCanvas.getContext('2d');
     const dataType = document.getElementById('chartDataType')?.value || 'income';
 
-    // Prepare data
     const labels = [];
     const dataset1Data = [];
     const dataset2Data = [];
@@ -598,7 +596,6 @@ function updateTrendChart() {
         labels.push(date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
         if (dataType === 'income') {
-            // Calculate income vs expenses
             let dayIncome = 0;
             transactions.forEach(tx => {
                 if (new Date(tx.date).toDateString() === date.toDateString()) {
@@ -607,18 +604,15 @@ function updateTrendChart() {
                     dayIncome += (inTotal - outTotal);
                 }
             });
-
             let dayExpense = 0;
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
                     dayExpense += Number(ex.amount);
                 }
             });
-
             dataset1Data.push(Math.max(0, dayIncome));
             dataset2Data.push(dayExpense);
         } else if (dataType === 'cash') {
-            // Calculate cash in vs cash out
             let cashIn = 0, cashOut = 0;
             transactions.forEach(tx => {
                 if (new Date(tx.date).toDateString() === date.toDateString()) {
@@ -632,16 +626,12 @@ function updateTrendChart() {
             });
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
-                    if ((ex.payment_type || '').toLowerCase() === 'cash') {
-                        cashOut += Number(ex.amount);
-                    }
+                    (ex.payment_type || '').toLowerCase() === 'cash' && (cashOut += Number(ex.amount));
                 }
             });
-
             dataset1Data.push(cashIn);
             dataset2Data.push(cashOut);
         } else if (dataType === 'bank') {
-            // Calculate bank in vs bank out
             let bankIn = 0, bankOut = 0;
             transactions.forEach(tx => {
                 if (new Date(tx.date).toDateString() === date.toDateString()) {
@@ -655,36 +645,76 @@ function updateTrendChart() {
             });
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
-                    if ((ex.payment_type || '').toLowerCase() !== 'cash') {
-                        bankOut += Number(ex.amount);
-                    }
+                    (ex.payment_type || '').toLowerCase() !== 'cash' && (bankOut += Number(ex.amount));
                 }
             });
-
             dataset1Data.push(bankIn);
             dataset2Data.push(bankOut);
+        } else if (dataType === 'profit') {
+            let dayProfit = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    dayProfit += (inTotal - outTotal);
+                }
+            });
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    dayProfit -= Number(ex.amount);
+                }
+            });
+            dataset1Data.push(dayProfit);
         }
     }
 
-    // Set labels and colors based on data type
-    let label1, label2, color1, color2;
-    if (dataType === 'income') {
-        label1 = 'Income'; label2 = 'Expenses';
-        color1 = '#4caf50'; color2 = '#f44336';
-    } else if (dataType === 'cash') {
-        label1 = 'Cash In'; label2 = 'Cash Out';
-        color1 = '#2196f3'; color2 = '#ff9800';
+    let datasets;
+    if (dataType === 'profit') {
+        datasets = [{
+            label: 'Profit',
+            data: dataset1Data,
+            borderColor: '#00bcd4',
+            backgroundColor: 'rgba(0, 188, 212, 0.1)',
+            fill: false,
+            tension: 0.4,
+            borderWidth: 3,
+        }];
     } else {
-        label1 = 'Bank In'; label2 = 'Bank Out';
-        color1 = '#9c27b0'; color2 = '#607d8b';
+        let label1, label2, color1, color2;
+        if (dataType === 'income') {
+            label1 = 'Income'; label2 = 'Expenses';
+            color1 = '#4caf50'; color2 = '#f44336';
+        } else if (dataType === 'cash') {
+            label1 = 'Cash In'; label2 = 'Cash Out';
+            color1 = '#2196f3'; color2 = '#ff9800';
+        } else { // bank
+            label1 = 'Bank In'; label2 = 'Bank Out';
+            color1 = '#9c27b0'; color2 = '#607d8b';
+        }
+        datasets = [{
+            label: label1,
+            data: dataset1Data,
+            borderColor: color1,
+            backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            fill: false,
+            tension: 0.4,
+            borderWidth: 3,
+        }, {
+            label: label2,
+            data: dataset2Data,
+            borderColor: color2,
+            backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            fill: false,
+            tension: 0.4,
+            borderWidth: 3,
+        }];
     }
 
-    // Create the new chart
     trendChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
-            datasets: datasets
+            datasets: datasets // <-- मुख्य बदलाव यहाँ है, यह अब सही वेरिएबल का उपयोग कर रहा है
         },
         options: {
             responsive: true,
@@ -694,22 +724,11 @@ function updateTrendChart() {
                 mode: 'index'
             },
             scales: {
-                x: {
-                    grid: {
-                        display: false
-                    }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                }
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.05)' } }
             },
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                     titleColor: '#333',
