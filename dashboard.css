@@ -979,7 +979,7 @@ tr.settled-row:hover td {
 }
 
 .receipt-logo-v2 img {
-    height: 60px;
+    height: 80px;
     width: auto;
 }
 
@@ -989,8 +989,9 @@ tr.settled-row:hover td {
 
 .receipt-store-details-v2 h2 {
     margin: 0;
-    font-size: 1.6rem;
+    font-size: 2rem;
     color: #333;
+    text-align: cenetr;
 }
 
 .receipt-store-details-v2 p {
