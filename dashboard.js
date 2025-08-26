@@ -476,18 +476,19 @@ function init() {
             }
         });
     }
+    // NEW: Add event listeners for period tabs
+    document.querySelectorAll('.period-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            // Remove active class from all tabs
+            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+            // Add active class to the clicked tab
+            this.classList.add('active');
+            // Update the chart
+            updateTrendChart();
+        });
+    });
 
-    // Form submissions with null checks
-    // Transaction form is already handled above in the code
 
-    // Form submissions are already handled above in the code with their own event listeners
-
-    // Settle and profile forms are already handled above in the code
-
-    // Button handlers with null checks
-    // Button handlers are already set up above in the code
-
-    // Tab functionality is handled by setupTabEventListeners()
 }
 
 // Profile management functions
@@ -1583,6 +1584,7 @@ function updateTrendChart() {
                     });
                 }
             });
+
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
                     if ((ex.payment_type || '').toLowerCase() !== 'cash') {
@@ -1593,20 +1595,71 @@ function updateTrendChart() {
 
             dataset1Data.push(bankIn);
             dataset2Data.push(bankOut);
+        }   else if (dataType === 'profit') { // <-- यहाँ से नया कोड जोड़ें
+            // Calculate daily profit
+            let dayProfit = 0;
+            transactions.forEach(tx => {
+                if (new Date(tx.date).toDateString() === date.toDateString()) {
+                    const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                    dayProfit += (inTotal - outTotal);
+                }
+            });
+
+            expenses.forEach(ex => {
+                if (new Date(ex.date).toDateString() === date.toDateString()) {
+                    dayProfit -= Number(ex.amount);
+                }
+            });
+            dataset1Data.push(dayProfit);
         }
     }
+        
+    
 
     // Set labels and colors based on data type
     let label1, label2, color1, color2;
-    if (dataType === 'income') {
-        label1 = 'Income'; label2 = 'Expenses';
-        color1 = '#4caf50'; color2 = '#f44336';
-    } else if (dataType === 'cash') {
-        label1 = 'Cash In'; label2 = 'Cash Out';
-        color1 = '#2196f3'; color2 = '#ff9800';
+    // Set labels and colors based on data type
+    let datasets;
+    if (dataType === 'profit') {
+        datasets = [{
+            label: 'Profit',
+            data: dataset1Data,
+            borderColor: '#00bcd4',
+            backgroundColor: 'rgba(0, 188, 212, 0.1)',
+            fill: false, // Fill हटा दिया
+            tension: 0.4,
+            borderWidth: 3,
+        }];
     } else {
-        label1 = 'Bank In'; label2 = 'Bank Out';
-        color1 = '#9c27b0'; color2 = '#607d8b';
+        let label1, label2, color1, color2;
+        if (dataType === 'income') {
+            label1 = 'Income'; label2 = 'Expenses';
+            color1 = '#4caf50'; color2 = '#f44336';
+        } else if (dataType === 'cash') {
+            label1 = 'Cash In'; label2 = 'Cash Out';
+            color1 = '#2196f3'; color2 = '#ff9800';
+        } else { // bank
+            label1 = 'Bank In'; label2 = 'Bank Out';
+            color1 = '#9c27b0'; color2 = '#607d8b';
+        }
+        datasets = [{
+            label: label1,
+            data: dataset1Data,
+            borderColor: color1,
+            backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            fill: false,
+            tension: 0.4,
+            borderWidth: 3,
+        }, {
+            label: label2,
+            data: dataset2Data,
+            borderColor: color2,
+            backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            fill: false,
+            tension: 0.4,
+            borderWidth: 3,
+        }];
     }
 
     // Create the new chart
@@ -1620,7 +1673,7 @@ function updateTrendChart() {
                     data: dataset1Data,
                     borderColor: color1,
                     backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                    fill: true,
+                    fill: false,
                     tension: 0.4,
                     borderWidth: 3,
                     pointRadius: 4,
@@ -1631,7 +1684,7 @@ function updateTrendChart() {
                     data: dataset2Data,
                     borderColor: color2,
                     backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                    fill: true,
+                    fill: false,
                     tension: 0.4,
                     borderWidth: 3,
                     pointRadius: 4,
@@ -1679,7 +1732,6 @@ function updateBankPieChart() {
     const chartCanvas = document.getElementById('bankPieChart');
     if (!chartCanvas) return;
 
-    // Destroy existing chart if it exists
     if (bankPieChart) {
         bankPieChart.destroy();
         bankPieChart = null;
@@ -1688,33 +1740,44 @@ function updateBankPieChart() {
     const ctx = chartCanvas.getContext('2d');
     const bankBalances = {};
 
-    // Calculate balances from transactions
+    // Step 1: Initialize all known banks with a balance of 0
+    banks.forEach(bankName => {
+        if (bankName && bankName !== 'Cash' && bankName !== 'Bank (Generic)') {
+            bankBalances[bankName] = 0;
+        }
+    });
+
+    // Step 2: Calculate balances from all sources
+    // Transactions
     transactions.forEach(tx => {
         (tx.in_payments || []).forEach(p => {
-            if (p.type !== 'Cash') {
-                bankBalances[p.type] = (bankBalances[p.type] || 0) + Number(p.amount);
-            }
+            if (p.type && p.type !== 'Cash') bankBalances[p.type] = (bankBalances[p.type] || 0) + Number(p.amount);
         });
         (tx.out_payments || []).forEach(p => {
-            if (p.type !== 'Cash') {
-                bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount);
+            if (p.type && p.type !== 'Cash') bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount);
+        });
+    });
+
+    // Expenses
+    expenses.forEach(ex => {
+        (Array.isArray(ex.split_payments) ? ex.split_payments : [{ amount: ex.amount, type: ex.payment_type }]).forEach(p => {
+            if (p.type && p.type !== 'Cash') {
+                bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount || 0);
             }
         });
     });
 
-    // Subtract expenses paid from banks (supports split payments)
-    expenses.forEach(ex => {
-        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
-        if (splits && splits.length) {
-            splits.forEach(p => {
-                if ((p.type || '').toLowerCase() !== 'cash') {
-                    bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount || 0);
-                }
-            });
-        } else if ((ex.payment_type || '').toLowerCase() !== 'cash') {
-            bankBalances[ex.payment_type] = (bankBalances[ex.payment_type] || 0) - Number(ex.amount || 0);
+    // Transfers
+    transfers.forEach(tr => {
+        const amount = Number(tr.amount) || 0;
+        if (tr.from && tr.from !== 'Cash') {
+            bankBalances[tr.from] = (bankBalances[tr.from] || 0) - amount;
+        }
+        if (tr.to && tr.to !== 'Cash') {
+            bankBalances[tr.to] = (bankBalances[tr.to] || 0) + amount;
         }
     });
+
 
     const labels = Object.keys(bankBalances);
     const data = Object.values(bankBalances);
