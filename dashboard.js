@@ -166,7 +166,7 @@ let bankStatementFilter = { from: null, to: null };
 function openTab(tabName) {
     Object.values(tabContents).forEach(content => content.classList.remove('active'));
     Object.values(tabs).forEach(tab => tab.classList.remove('active'));
-    
+
     if (tabContents[tabName]) tabContents[tabName].classList.add('active');
     if (tabs[tabName]) tabs[tabName].classList.add('active');
 }
@@ -465,7 +465,7 @@ function init() {
     });
 
     // Close button handlers with null checks
-    const closeBtns = document.querySelectorAll('.close-btn');
+    const closeBtns = document.querySelectorAll('.modal .close-btn');
     if (closeBtns) {
         closeBtns.forEach(btn => {
             if (btn) {
@@ -476,19 +476,18 @@ function init() {
             }
         });
     }
-    // NEW: Add event listeners for period tabs
-    document.querySelectorAll('.period-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            // Remove active class from all tabs
-            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
-            // Add active class to the clicked tab
-            this.classList.add('active');
-            // Update the chart
-            updateTrendChart();
-        });
-    });
 
+    // Form submissions with null checks
+    // Transaction form is already handled above in the code
 
+    // Form submissions are already handled above in the code with their own event listeners
+
+    // Settle and profile forms are already handled above in the code
+
+    // Button handlers with null checks
+    // Button handlers are already set up above in the code
+
+    // Tab functionality is handled by setupTabEventListeners()
 }
 
 // Profile management functions
@@ -626,7 +625,9 @@ function updateTrendChart() {
             });
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
-                    (ex.payment_type || '').toLowerCase() === 'cash' && (cashOut += Number(ex.amount));
+                    if ((ex.payment_type || '').toLowerCase() === 'cash') {
+                        cashOut += Number(ex.amount);
+                    }
                 }
             });
             dataset1Data.push(cashIn);
@@ -645,7 +646,9 @@ function updateTrendChart() {
             });
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
-                    (ex.payment_type || '').toLowerCase() !== 'cash' && (bankOut += Number(ex.amount));
+                    if ((ex.payment_type || '').toLowerCase() !== 'cash') {
+                        bankOut += Number(ex.amount);
+                    }
                 }
             });
             dataset1Data.push(bankIn);
@@ -668,6 +671,7 @@ function updateTrendChart() {
         }
     }
 
+    // Create datasets based on data type
     let datasets;
     if (dataType === 'profit') {
         datasets = [{
@@ -678,6 +682,8 @@ function updateTrendChart() {
             fill: false,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
         }];
     } else {
         let label1, label2, color1, color2;
@@ -687,7 +693,7 @@ function updateTrendChart() {
         } else if (dataType === 'cash') {
             label1 = 'Cash In'; label2 = 'Cash Out';
             color1 = '#2196f3'; color2 = '#ff9800';
-        } else { // bank
+        } else {
             label1 = 'Bank In'; label2 = 'Bank Out';
             color1 = '#9c27b0'; color2 = '#607d8b';
         }
@@ -695,26 +701,31 @@ function updateTrendChart() {
             label: label1,
             data: dataset1Data,
             borderColor: color1,
-            backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            backgroundColor: color1.includes('rgba') ? color1 : color1.replace('rgb', 'rgba').replace(')', ', 0.1)'),
             fill: false,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
         }, {
             label: label2,
             data: dataset2Data,
             borderColor: color2,
-            backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            backgroundColor: color2.includes('rgba') ? color2 : color2.replace('rgb', 'rgba').replace(')', ', 0.1)'),
             fill: false,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
         }];
     }
 
+    // Create the new chart
     trendChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
-            datasets: datasets // <-- मुख्य बदलाव यहाँ है, यह अब सही वेरिएबल का उपयोग कर रहा है
+            datasets: datasets
         },
         options: {
             responsive: true,
@@ -724,11 +735,22 @@ function updateTrendChart() {
                 mode: 'index'
             },
             scales: {
-                x: { grid: { display: false } },
-                y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.05)' } }
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                }
             },
             plugins: {
-                legend: { display: false },
+                legend: {
+                    display: false
+                },
                 tooltip: {
                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                     titleColor: '#333',
@@ -1138,7 +1160,7 @@ function showReceipt(type, data) {
 
     // --- Client and Receipt Meta Info ---
     setText('receiptClientName', data.name || data.category || 'N/A');
-    setText('receiptClientAddress', data.address || '');
+    setText('receiptClientAddress', data.address || profileData.address || '');
     setText('receiptClientPhone', data.phone || '');
     const dateObj = data.date ? new Date(data.date) : new Date();
     setText('receiptDate', dateObj.toLocaleString());
@@ -1472,7 +1494,7 @@ forms.settle.addEventListener('submit', async function (e) {
 
         // Re-render everything
         init();
-        modals.settle.style.display = 'none';
+        if (modals.settle) modals.settle.style.display = 'none';
         alert(`${settleType} settled successfully and a transaction was recorded.`);
 
     } catch (error) {
@@ -1503,7 +1525,6 @@ function updateTrendChart() {
     const chartCanvas = document.getElementById('trendChart');
     if (!chartCanvas) return;
 
-    // Destroy existing chart if it exists
     if (trendChart) {
         trendChart.destroy();
         trendChart = null;
@@ -1512,7 +1533,6 @@ function updateTrendChart() {
     const ctx = chartCanvas.getContext('2d');
     const dataType = document.getElementById('chartDataType')?.value || 'income';
 
-    // Prepare data
     const labels = [];
     const dataset1Data = [];
     const dataset2Data = [];
@@ -1525,7 +1545,6 @@ function updateTrendChart() {
         labels.push(date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
         if (dataType === 'income') {
-            // Calculate income vs expenses
             let dayIncome = 0;
             transactions.forEach(tx => {
                 if (new Date(tx.date).toDateString() === date.toDateString()) {
@@ -1534,18 +1553,15 @@ function updateTrendChart() {
                     dayIncome += (inTotal - outTotal);
                 }
             });
-
             let dayExpense = 0;
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
                     dayExpense += Number(ex.amount);
                 }
             });
-
             dataset1Data.push(Math.max(0, dayIncome));
             dataset2Data.push(dayExpense);
         } else if (dataType === 'cash') {
-            // Calculate cash in vs cash out
             let cashIn = 0, cashOut = 0;
             transactions.forEach(tx => {
                 if (new Date(tx.date).toDateString() === date.toDateString()) {
@@ -1564,11 +1580,9 @@ function updateTrendChart() {
                     }
                 }
             });
-
             dataset1Data.push(cashIn);
             dataset2Data.push(cashOut);
         } else if (dataType === 'bank') {
-            // Calculate bank in vs bank out
             let bankIn = 0, bankOut = 0;
             transactions.forEach(tx => {
                 if (new Date(tx.date).toDateString() === date.toDateString()) {
@@ -1580,7 +1594,6 @@ function updateTrendChart() {
                     });
                 }
             });
-
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
                     if ((ex.payment_type || '').toLowerCase() !== 'cash') {
@@ -1588,11 +1601,9 @@ function updateTrendChart() {
                     }
                 }
             });
-
             dataset1Data.push(bankIn);
             dataset2Data.push(bankOut);
-        }   else if (dataType === 'profit') { // <-- यहाँ से नया कोड जोड़ें
-            // Calculate daily profit
+        } else if (dataType === 'profit') {
             let dayProfit = 0;
             transactions.forEach(tx => {
                 if (new Date(tx.date).toDateString() === date.toDateString()) {
@@ -1601,7 +1612,6 @@ function updateTrendChart() {
                     dayProfit += (inTotal - outTotal);
                 }
             });
-
             expenses.forEach(ex => {
                 if (new Date(ex.date).toDateString() === date.toDateString()) {
                     dayProfit -= Number(ex.amount);
@@ -1610,12 +1620,8 @@ function updateTrendChart() {
             dataset1Data.push(dayProfit);
         }
     }
-        
-    
 
-    // Set labels and colors based on data type
-    let label1, label2, color1, color2;
-    // Set labels and colors based on data type
+    // Create datasets based on data type
     let datasets;
     if (dataType === 'profit') {
         datasets = [{
@@ -1623,9 +1629,11 @@ function updateTrendChart() {
             data: dataset1Data,
             borderColor: '#00bcd4',
             backgroundColor: 'rgba(0, 188, 212, 0.1)',
-            fill: false, // Fill हटा दिया
+            fill: false,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
         }];
     } else {
         let label1, label2, color1, color2;
@@ -1635,7 +1643,7 @@ function updateTrendChart() {
         } else if (dataType === 'cash') {
             label1 = 'Cash In'; label2 = 'Cash Out';
             color1 = '#2196f3'; color2 = '#ff9800';
-        } else { // bank
+        } else {
             label1 = 'Bank In'; label2 = 'Bank Out';
             color1 = '#9c27b0'; color2 = '#607d8b';
         }
@@ -1643,18 +1651,22 @@ function updateTrendChart() {
             label: label1,
             data: dataset1Data,
             borderColor: color1,
-            backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            backgroundColor: color1.includes('rgba') ? color1 : color1.replace('rgb', 'rgba').replace(')', ', 0.1)'),
             fill: false,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
         }, {
             label: label2,
             data: dataset2Data,
             borderColor: color2,
-            backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            backgroundColor: color2.includes('rgba') ? color2 : color2.replace('rgb', 'rgba').replace(')', ', 0.1)'),
             fill: false,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
         }];
     }
 
@@ -1663,30 +1675,7 @@ function updateTrendChart() {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [
-                {
-                    label: label1,
-                    data: dataset1Data,
-                    borderColor: color1,
-                    backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                    fill: false,
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                },
-                {
-                    label: label2,
-                    data: dataset2Data,
-                    borderColor: color2,
-                    backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                    fill: false,
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                }
-            ]
+            datasets: datasets
         },
         options: {
             responsive: true,
@@ -1728,6 +1717,7 @@ function updateBankPieChart() {
     const chartCanvas = document.getElementById('bankPieChart');
     if (!chartCanvas) return;
 
+    // Destroy existing chart if it exists
     if (bankPieChart) {
         bankPieChart.destroy();
         bankPieChart = null;
@@ -1736,44 +1726,33 @@ function updateBankPieChart() {
     const ctx = chartCanvas.getContext('2d');
     const bankBalances = {};
 
-    // Step 1: Initialize all known banks with a balance of 0
-    banks.forEach(bankName => {
-        if (bankName && bankName !== 'Cash' && bankName !== 'Bank (Generic)') {
-            bankBalances[bankName] = 0;
-        }
-    });
-
-    // Step 2: Calculate balances from all sources
-    // Transactions
+    // Calculate balances from transactions
     transactions.forEach(tx => {
         (tx.in_payments || []).forEach(p => {
-            if (p.type && p.type !== 'Cash') bankBalances[p.type] = (bankBalances[p.type] || 0) + Number(p.amount);
+            if (p.type !== 'Cash') {
+                bankBalances[p.type] = (bankBalances[p.type] || 0) + Number(p.amount);
+            }
         });
         (tx.out_payments || []).forEach(p => {
-            if (p.type && p.type !== 'Cash') bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount);
-        });
-    });
-
-    // Expenses
-    expenses.forEach(ex => {
-        (Array.isArray(ex.split_payments) ? ex.split_payments : [{ amount: ex.amount, type: ex.payment_type }]).forEach(p => {
-            if (p.type && p.type !== 'Cash') {
-                bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount || 0);
+            if (p.type !== 'Cash') {
+                bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount);
             }
         });
     });
 
-    // Transfers
-    transfers.forEach(tr => {
-        const amount = Number(tr.amount) || 0;
-        if (tr.from && tr.from !== 'Cash') {
-            bankBalances[tr.from] = (bankBalances[tr.from] || 0) - amount;
-        }
-        if (tr.to && tr.to !== 'Cash') {
-            bankBalances[tr.to] = (bankBalances[tr.to] || 0) + amount;
+    // Subtract expenses paid from banks (supports split payments)
+    expenses.forEach(ex => {
+        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
+        if (splits && splits.length) {
+            splits.forEach(p => {
+                if ((p.type || '').toLowerCase() !== 'cash') {
+                    bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount || 0);
+                }
+            });
+        } else if ((ex.payment_type || '').toLowerCase() !== 'cash') {
+            bankBalances[ex.payment_type] = (bankBalances[ex.payment_type] || 0) - Number(ex.amount || 0);
         }
     });
-
 
     const labels = Object.keys(bankBalances);
     const data = Object.values(bankBalances);
