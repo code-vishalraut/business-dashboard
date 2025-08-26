@@ -684,30 +684,7 @@ function updateTrendChart() {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [
-                {
-                    label: label1,
-                    data: dataset1Data,
-                    borderColor: color1,
-                    backgroundColor: color1.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                },
-                {
-                    label: label2,
-                    data: dataset2Data,
-                    borderColor: color2,
-                    backgroundColor: color2.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                }
-            ]
+            datasets: datasets
         },
         options: {
             responsive: true,
