@@ -1280,24 +1280,44 @@ function numberToWords(num) {
 }
 
 // Add this function to handle all button clicks in the table
+// dashboard.js
+
 function setupEventListeners() {
     document.body.addEventListener('click', (e) => {
-        // Handle Edit Button clicks
+        // Handle Edit Button for Transactions
         const editBtn = e.target.closest('.edit-btn');
         if (editBtn) {
             const txId = editBtn.dataset.id;
             if (txId) {
                 editTransaction(txId);
             }
+            return; // Stop further execution
         }
 
-        // Handle Receipt Button clicks
+        // Handle Receipt Button for Transactions and Expenses
         const receiptBtn = e.target.closest('.receipt-btn');
         if (receiptBtn) {
-            const txId = receiptBtn.dataset.id;
-            if (txId) {
-                showReceipt('transaction', transactions.find(t => t.id === txId));
+            const id = receiptBtn.dataset.id;
+            const type = receiptBtn.dataset.type; // 'expense' or default 'transaction'
+            if (id) {
+                if (type === 'expense') {
+                    showReceipt('expense', expenses.find(item => item.id == id));
+                } else {
+                    showReceipt('transaction', transactions.find(item => item.id == id));
+                }
             }
+            return; // Stop further execution
+        }
+
+        // Handle Settle Button for Debtors and Creditors
+        const settleBtn = e.target.closest('.settle-btn');
+        if (settleBtn) {
+            const id = settleBtn.dataset.id;
+            const type = settleBtn.dataset.type; // 'debtor' or 'creditor'
+            if (id && type) {
+                openSettleModal(type, id);
+            }
+            return; // Stop further execution
         }
     });
 }
@@ -1879,16 +1899,6 @@ function renderDebtors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
-    // ADDED: Event listener for debtor settle buttons
-    document.querySelectorAll('#debtorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const debtorId = this.getAttribute('data-id');
-            const debtor = debtors.find(d => d.id === debtorId);
-            if (debtor) {
-                openSettleModal('debtor', debtorId); // Pass type and ID
-            }
-        });
-    });
 }
 
 function renderCreditors() {
@@ -1919,16 +1929,6 @@ function renderCreditors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
-    // ADDED: Event listener for creditor settle buttons
-    document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const creditorId = this.getAttribute('data-id');
-            const creditor = creditors.find(c => c.id === creditorId);
-            if (creditor) {
-                openSettleModal('creditor', creditorId);
-            }
-        });
-    });
 }
 
 // Debtors and Creditors settle modal reset
