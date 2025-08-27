@@ -2403,11 +2403,6 @@ function openSettleModal(type, id) {
     showModal('settle');
 }
 
-
-
-// --- Settle Form Submit: CORRECTED LOGIC ---
-// dashboard.js
-
 // --- Settle Form Submit: CORRECTED LOGIC ---
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -2447,7 +2442,7 @@ forms.settle.addEventListener('submit', async function (e) {
         }
 
         // Re-render everything to reflect changes in statements
-        makeStatements(); 
+        makeStatements();
         renderDebtors();
         renderCreditors();
 
