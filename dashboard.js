@@ -477,18 +477,17 @@ function init() {
         });
     }
 
-    // Add event listeners for chart period tabs
-    document.querySelectorAll('.period-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            // Remove active class from all tabs
-            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
-            // Add active class to the clicked tab
-            this.classList.add('active');
-            // Redraw the chart with the new period
-            updateTrendChart();
-        });
-    });
+    // Form submissions with null checks
+    // Transaction form is already handled above in the code
 
+    // Form submissions are already handled above in the code with their own event listeners
+
+    // Settle and profile forms are already handled above in the code
+
+    // Button handlers with null checks
+    // Button handlers are already set up above in the code
+
+    // Tab functionality is handled by setupTabEventListeners()
 }
 
 // Profile management functions
@@ -908,6 +907,16 @@ function renderDebtors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
+    // ADDED: Event listener for debtor settle buttons
+    document.querySelectorAll('#debtorsBody .settle-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const debtorId = this.getAttribute('data-id');
+            const debtor = debtors.find(d => d.id === debtorId);
+            if (debtor) {
+                openSettleModal('debtor', debtorId); // Pass type and ID
+            }
+        });
+    });
 }
 
 function renderCreditors() {
@@ -938,6 +947,16 @@ function renderCreditors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
+    // ADDED: Event listener for creditor settle buttons
+    document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const creditorId = this.getAttribute('data-id');
+            const creditor = creditors.find(c => c.id === creditorId);
+            if (creditor) {
+                openSettleModal('creditor', creditorId);
+            }
+        });
+    });
 }
 
 // Expense form submit logic (remove received checkbox logic)
@@ -1251,51 +1270,33 @@ function numberToWords(num) {
     const a = [ '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen' ];
     const b = [ '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety' ];
     if ((num = num.toString()).length > 5) return 'Amount too large';
-    let str = '';
     let n = ('00000' + num).substr(-5).match(/^(\d{2})(\d{3})$/);
     if (!n) return '';
+    let str = '';
     str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + ' Thousand ' : '';
     str += (n[2] != 0) ? ((str != '') ? ' ' : '') + (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) : '';
     return str.trim() + ' Rupees only';
 }
 
 // Add this function to handle all button clicks in the table
-// dashboard.js
-
-// dashboard.js
-
 function setupEventListeners() {
     document.body.addEventListener('click', (e) => {
-        // Handle Edit Button for Transactions
+        // Handle Edit Button clicks
         const editBtn = e.target.closest('.edit-btn');
         if (editBtn) {
             const txId = editBtn.dataset.id;
-            if (txId) editTransaction(txId);
-            return;
+            if (txId) {
+                editTransaction(txId);
+            }
         }
 
-        // Handle Receipt Button for Transactions and Expenses
+        // Handle Receipt Button clicks
         const receiptBtn = e.target.closest('.receipt-btn');
         if (receiptBtn) {
-            const id = receiptBtn.dataset.id;
-            const type = receiptBtn.dataset.type;
-            if (id) {
-                const sourceData = type === 'expense' ? expenses : transactions;
-                const item = sourceData.find(i => i.id == id);
-                if (item) showReceipt(type || 'transaction', item);
+            const txId = receiptBtn.dataset.id;
+            if (txId) {
+                showReceipt('transaction', transactions.find(t => t.id === txId));
             }
-            return;
-        }
-
-        // Handle Settle Button for Debtors and Creditors
-        const settleBtn = e.target.closest('.settle-btn');
-        if (settleBtn) {
-            const id = settleBtn.dataset.id;
-            const type = settleBtn.dataset.type;
-            if (id && type) {
-                openSettleModal(type, id);
-            }
-            return;
         }
     });
 }
@@ -1424,47 +1425,26 @@ function setupRemoveSplitButtons() {
 }
 
 // --- Settle Debt Logic ---
-function openSettleModal(type, id) {
-    console.log('Opening settle modal for:', type, id);
+async function openSettleModal(type, id) {
     updatePaymentTypeOptions(); // Ensure payment options are fresh
     const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
-    if (!item) {
-        console.error('Item not found:', type, id);
-        return;
-    }
+    if (!item) return;
 
-    const settleModal = document.getElementById('settleModal');
-    if (!settleModal) {
-        console.error('Settle modal not found in DOM');
-        return;
-    }
+    document.getElementById('settleModalTitle').textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    document.getElementById('settleName').textContent = item.name || '';
+    document.getElementById('settleOriginalAmount').textContent = Number(item.amount).toFixed(2);
+    document.getElementById('settleAmount').value = item.amount;
+    document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
+    document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
 
-    const titleElem = document.getElementById('settleModalTitle');
-    const nameElem = document.getElementById('settleName');
-    const amountElem = document.getElementById('settleOriginalAmount');
-    const settleAmountElem = document.getElementById('settleAmount');
-    const paymentTypeElem = document.getElementById('settlePaymentType');
-    const descElem = document.getElementById('settleDescription');
-    const dateElem = document.getElementById('settleDate');
-
-    if (titleElem) titleElem.textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-    if (nameElem) nameElem.textContent = item.name || '';
-    if (amountElem) amountElem.textContent = Number(item.amount).toFixed(2);
-    if (settleAmountElem) settleAmountElem.value = item.amount;
-    if (paymentTypeElem) paymentTypeElem.value = item.payment_type || 'Cash';
-    if (descElem) descElem.value = `Settlement for ${item.name}`;
-    if (dateElem) dateElem.value = new Date().toISOString().slice(0, 16);
+    // Set settle date default to now
+    document.getElementById('settleDate').value = new Date().toISOString().slice(0, 16);
 
     // Store type and id for the submit handler
-    if (forms.settle) {
-        forms.settle.dataset.settleType = type;
-        forms.settle.dataset.editingId = id;
-    }
-
-    console.log('Showing settle modal');
+    forms.settle.dataset.settleType = type;
+    forms.settle.dataset.editingId = id;
     showModal('settle');
 }
-
 
 // --- Settle Form Submit: Only update status, do NOT create a transaction (fix double counting) ---
 forms.settle.addEventListener('submit', async function (e) {
@@ -1877,6 +1857,16 @@ function renderDebtors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
+    // ADDED: Event listener for debtor settle buttons
+    document.querySelectorAll('#debtorsBody .settle-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const debtorId = this.getAttribute('data-id');
+            const debtor = debtors.find(d => d.id === debtorId);
+            if (debtor) {
+                openSettleModal('debtor', debtorId); // Pass type and ID
+            }
+        });
+    });
 }
 
 function renderCreditors() {
@@ -1907,6 +1897,16 @@ function renderCreditors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
+    // ADDED: Event listener for creditor settle buttons
+    document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const creditorId = this.getAttribute('data-id');
+            const creditor = creditors.find(c => c.id === creditorId);
+            if (creditor) {
+                openSettleModal('creditor', creditorId);
+            }
+        });
+    });
 }
 
 // Debtors and Creditors settle modal reset
@@ -2099,12 +2099,11 @@ function makeStatements() {
         }
     });
 
-    // dashboard.js -> makeStatements()
-
-    cashStatements.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)); // Keep this for correct balance calculation
+    cashStatements.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     let runningCash = 0;
-    const cashRows = cashStatements.map(entry => {
+    const cashRowsHtml = cashStatements.map(entry => {
         runningCash += Number(entry.in) - Number(entry.out);
+        // Format date as DD/MM/YYYY
         let dateStr = '';
         if (entry.date) {
             const d = new Date(entry.date);
@@ -2118,11 +2117,8 @@ function makeStatements() {
                 <td>₹${(Number(entry.out) || 0).toFixed(2)}</td>
                 <td>₹${runningCash.toFixed(2)}</td>
             </tr>`;
-    });
-
-    if (tables.cashStatementBody) {
-        tables.cashStatementBody.innerHTML = cashRows.reverse().join(''); // Reverse the array before rendering
-    }
+    }).join('');
+    if (tables.cashStatementBody) tables.cashStatementBody.innerHTML = cashRowsHtml;
 
     // Build bank statements per bank
     bankStatements = {};
@@ -2192,29 +2188,31 @@ function makeStatements() {
 
     // Creditors (money plus/in)
     (creditors || []).forEach(cr => {
-        // Entry for when the loan was TAKEN (money comes IN)
+        // Ignore settled for original loan, but add settlement as minus entry
+        const isSettled = cr.status === 'Settled';
         (Array.isArray(cr.split_payments) ? cr.split_payments : [{ amount: cr.amount, type: cr.payment_type }]).forEach(p => {
             const amt = Number(p.amount) || 0;
             if (!amt) return;
-
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: cr.date, description: `Loan from ${cr.name}`, in: amt, out: 0 });
-            } else if (p.type) {
-                if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: cr.date, description: `Loan from ${cr.name}`, in: amt, out: 0 });
+            if (!isSettled) {
+                // Loan taken (plus)
+                if ((p.type || '').toLowerCase() === 'cash') {
+                    cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
+                } else if (p.type) {
+                    if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                    bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
+                }
             }
         });
-
-        // If SETTLED, create a separate entry for when it was PAID BACK (money goes OUT)
-        if (cr.status === 'Settled') {
-            const settleAmt = Number(cr.settled_amount) || 0;
-            const settleType = (cr.settled_payment_type || '').toLowerCase();
+        // If settled, add settlement as minus (money paid back)
+        if (isSettled) {
+            const settleAmt = Number(cr.amount) || 0;
+            const settleType = (cr.payment_type || '').toLowerCase();
             if (settleAmt) {
                 if (settleType === 'cash') {
-                    cashStatements.push({ date: cr.settled_date, description: cr.settled_description || `Settlement to ${cr.name}`, in: 0, out: settleAmt });
-                } else if (cr.settled_payment_type) {
-                    if (!bankStatements[cr.settled_payment_type]) bankStatements[cr.settled_payment_type] = [];
-                    bankStatements[cr.settled_payment_type].push({ date: cr.settled_date, description: cr.settled_description || `Settlement to ${cr.name}`, in: 0, out: settleAmt });
+                    cashStatements.push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
+                } else if (cr.payment_type) {
+                    if (!bankStatements[cr.payment_type]) bankStatements[cr.payment_type] = [];
+                    bankStatements[cr.payment_type].push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
                 }
             }
         }
@@ -2340,98 +2338,85 @@ function renderBankStatement(bankName) {
 }
 
 // --- Settle Debt Logic ---
-function openSettleModal(type, id) {
-    console.log('Opening settle modal for:', type, id);
+async function openSettleModal(type, id) {
     updatePaymentTypeOptions(); // Ensure payment options are fresh
     const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
-    if (!item) {
-        console.error('Item not found:', type, id);
-        return;
-    }
+    if (!item) return;
 
-    const settleModal = document.getElementById('settleModal');
-    if (!settleModal) {
-        console.error('Settle modal not found in DOM');
-        return;
-    }
+    document.getElementById('settleModalTitle').textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    document.getElementById('settleName').textContent = item.name || '';
+    document.getElementById('settleOriginalAmount').textContent = Number(item.amount).toFixed(2);
+    document.getElementById('settleAmount').value = item.amount;
+    document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
+    document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
 
-    const titleElem = document.getElementById('settleModalTitle');
-    const nameElem = document.getElementById('settleName');
-    const amountElem = document.getElementById('settleOriginalAmount');
-    const settleAmountElem = document.getElementById('settleAmount');
-    const paymentTypeElem = document.getElementById('settlePaymentType');
-    const descElem = document.getElementById('settleDescription');
-    const dateElem = document.getElementById('settleDate');
-
-    if (titleElem) titleElem.textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-    if (nameElem) nameElem.textContent = item.name || '';
-    if (amountElem) amountElem.textContent = Number(item.amount).toFixed(2);
-    if (settleAmountElem) settleAmountElem.value = item.amount;
-    if (paymentTypeElem) paymentTypeElem.value = item.payment_type || 'Cash';
-    if (descElem) descElem.value = `Settlement for ${item.name}`;
-    if (dateElem) dateElem.value = new Date().toISOString().slice(0, 16);
+    // Set settle date default to now
+    document.getElementById('settleDate').value = new Date().toISOString().slice(0, 16);
 
     // Store type and id for the submit handler
-    if (forms.settle) {
-        forms.settle.dataset.settleType = type;
-        forms.settle.dataset.editingId = id;
-    }
-
-    console.log('Showing settle modal');
+    forms.settle.dataset.settleType = type;
+    forms.settle.dataset.editingId = id;
     showModal('settle');
 }
 
-// --- Settle Form Submit: CORRECTED LOGIC ---
+
+// Replace this entire block
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
     const settleType = this.dataset.settleType;
-    if (!editingId || !settleType) return;
-
-    const originalItem = settleType === 'debtor'
-        ? debtors.find(d => d.id === editingId)
-        : creditors.find(c => c.id === editingId);
+    const originalItem = settleType === 'debtor' ? debtors.find(d => d.id === editingId) : creditors.find(c => c.id === editingId);
 
     if (!originalItem) {
         alert("Could not find the original item to settle.");
         return;
     }
 
-    // Step 1: Update the item with settlement details and "Settled" status
-    const updatePayload = {
-        ...originalItem,
-        status: 'Settled',
-        // Store settlement details directly on the item
-        settled_date: document.getElementById('settleDate').value,
-        settled_amount: parseFloat(document.getElementById('settleAmount').value) || 0,
-        settled_payment_type: document.getElementById('settlePaymentType').value,
-        settled_description: document.getElementById('settleDescription').value
+    // 1. Mark the original debtor/creditor as Settled
+    const updatePayload = { ...originalItem, status: 'Settled' };
+
+    // 2. Create a new transaction for the settlement
+    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
+    const settlePaymentType = document.getElementById('settlePaymentType').value;
+    const transactionData = {
+        date: document.getElementById('settleDate').value,
+        name: originalItem.name,
+        description: document.getElementById('settleDescription').value,
+        status: 'Done',
+        in_payments: [],
+        out_payments: []
     };
 
-    try {
-        // Save the updated creditor/debtor to the database
-        const updatedItem = await apiCall('addOrUpdate', { table: `${settleType}s`, data: updatePayload });
+    if (settleType === 'debtor') { // Money comes IN when a debtor pays you back
+        transactionData.in_payments.push({ amount: settleAmount, type: settlePaymentType });
+    } else { // Money goes OUT when you pay a creditor back
+        transactionData.out_payments.push({ amount: settleAmount, type: settlePaymentType });
+    }
 
-        // Update local data array
+    try {
+        // Save both updates
+        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: updatePayload });
+        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: transactionData });
+
+        // Update local data
+        transactions.unshift(savedTx);
         if (settleType === 'debtor') {
-            debtors = debtors.map(d => d.id === editingId ? updatedItem : d);
+            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
         } else {
-            creditors = creditors.map(c => c.id === editingId ? updatedItem : c);
+            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
         }
 
-        // Re-render everything to reflect changes in statements
-        makeStatements();
-        renderDebtors();
-        renderCreditors();
-
+        // Re-render everything
+        init();
         if (modals.settle) modals.settle.style.display = 'none';
-        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
+        alert(`${settleType} settled successfully and a transaction was recorded.`);
 
     } catch (error) {
         console.error("Error settling debt:", error);
         alert('Failed to settle debt.');
     }
 });
+
 
 // === AI Assistant Minimize/Maximize ===
 function toggleAIChat() {
