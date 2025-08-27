@@ -2404,7 +2404,8 @@ function openSettleModal(type, id) {
 }
 
 
-// --- Settle Form Submit: Only update status, do NOT create a transaction (fix double counting) ---
+
+// --- Settle Form Submit: CORRECTED LOGIC ---
 // dashboard.js
 
 // --- Settle Form Submit: CORRECTED LOGIC ---
@@ -2435,10 +2436,10 @@ forms.settle.addEventListener('submit', async function (e) {
     };
 
     try {
-        // Save the updated creditor/debtor
+        // Save the updated creditor/debtor to the database
         const updatedItem = await apiCall('addOrUpdate', { table: `${settleType}s`, data: updatePayload });
 
-        // Update local data
+        // Update local data array
         if (settleType === 'debtor') {
             debtors = debtors.map(d => d.id === editingId ? updatedItem : d);
         } else {
@@ -2458,7 +2459,6 @@ forms.settle.addEventListener('submit', async function (e) {
         alert('Failed to settle debt.');
     }
 });
-
 
 // === AI Assistant Minimize/Maximize ===
 function toggleAIChat() {
