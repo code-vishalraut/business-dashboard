@@ -477,17 +477,18 @@ function init() {
         });
     }
 
-    // Form submissions with null checks
-    // Transaction form is already handled above in the code
+    // Add event listeners for chart period tabs
+    document.querySelectorAll('.period-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            // Remove active class from all tabs
+            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+            // Add active class to the clicked tab
+            this.classList.add('active');
+            // Redraw the chart with the new period
+            updateTrendChart();
+        });
+    });
 
-    // Form submissions are already handled above in the code with their own event listeners
-
-    // Settle and profile forms are already handled above in the code
-
-    // Button handlers with null checks
-    // Button handlers are already set up above in the code
-
-    // Tab functionality is handled by setupTabEventListeners()
 }
 
 // Profile management functions
@@ -2120,11 +2121,12 @@ function makeStatements() {
         }
     });
 
-    cashStatements.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    // dashboard.js -> makeStatements()
+
+    cashStatements.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)); // Keep this for correct balance calculation
     let runningCash = 0;
-    const cashRowsHtml = cashStatements.map(entry => {
+    const cashRows = cashStatements.map(entry => {
         runningCash += Number(entry.in) - Number(entry.out);
-        // Format date as DD/MM/YYYY
         let dateStr = '';
         if (entry.date) {
             const d = new Date(entry.date);
@@ -2138,8 +2140,11 @@ function makeStatements() {
                 <td>₹${(Number(entry.out) || 0).toFixed(2)}</td>
                 <td>₹${runningCash.toFixed(2)}</td>
             </tr>`;
-    }).join('');
-    if (tables.cashStatementBody) tables.cashStatementBody.innerHTML = cashRowsHtml;
+    });
+
+    if (tables.cashStatementBody) {
+        tables.cashStatementBody.innerHTML = cashRows.reverse().join(''); // Reverse the array before rendering
+    }
 
     // Build bank statements per bank
     bankStatements = {};
@@ -2209,31 +2214,29 @@ function makeStatements() {
 
     // Creditors (money plus/in)
     (creditors || []).forEach(cr => {
-        // Ignore settled for original loan, but add settlement as minus entry
-        const isSettled = cr.status === 'Settled';
+        // Entry for when the loan was TAKEN (money comes IN)
         (Array.isArray(cr.split_payments) ? cr.split_payments : [{ amount: cr.amount, type: cr.payment_type }]).forEach(p => {
             const amt = Number(p.amount) || 0;
             if (!amt) return;
-            if (!isSettled) {
-                // Loan taken (plus)
-                if ((p.type || '').toLowerCase() === 'cash') {
-                    cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
-                } else if (p.type) {
-                    if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                    bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
-                }
+
+            if ((p.type || '').toLowerCase() === 'cash') {
+                cashStatements.push({ date: cr.date, description: `Loan from ${cr.name}`, in: amt, out: 0 });
+            } else if (p.type) {
+                if (!bankStatements[p.type]) bankStatements[p.type] = [];
+                bankStatements[p.type].push({ date: cr.date, description: `Loan from ${cr.name}`, in: amt, out: 0 });
             }
         });
-        // If settled, add settlement as minus (money paid back)
-        if (isSettled) {
-            const settleAmt = Number(cr.amount) || 0;
-            const settleType = (cr.payment_type || '').toLowerCase();
+
+        // If SETTLED, create a separate entry for when it was PAID BACK (money goes OUT)
+        if (cr.status === 'Settled') {
+            const settleAmt = Number(cr.settled_amount) || 0;
+            const settleType = (cr.settled_payment_type || '').toLowerCase();
             if (settleAmt) {
                 if (settleType === 'cash') {
-                    cashStatements.push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
-                } else if (cr.payment_type) {
-                    if (!bankStatements[cr.payment_type]) bankStatements[cr.payment_type] = [];
-                    bankStatements[cr.payment_type].push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
+                    cashStatements.push({ date: cr.settled_date, description: cr.settled_description || `Settlement to ${cr.name}`, in: 0, out: settleAmt });
+                } else if (cr.settled_payment_type) {
+                    if (!bankStatements[cr.settled_payment_type]) bankStatements[cr.settled_payment_type] = [];
+                    bankStatements[cr.settled_payment_type].push({ date: cr.settled_date, description: cr.settled_description || `Settlement to ${cr.name}`, in: 0, out: settleAmt });
                 }
             }
         }
@@ -2402,55 +2405,53 @@ function openSettleModal(type, id) {
 
 
 // --- Settle Form Submit: Only update status, do NOT create a transaction (fix double counting) ---
+// dashboard.js
+
+// --- Settle Form Submit: CORRECTED LOGIC ---
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
     const settleType = this.dataset.settleType;
-    const originalItem = settleType === 'debtor' ? debtors.find(d => d.id === editingId) : creditors.find(c => c.id === editingId);
+    if (!editingId || !settleType) return;
+
+    const originalItem = settleType === 'debtor'
+        ? debtors.find(d => d.id === editingId)
+        : creditors.find(c => c.id === editingId);
 
     if (!originalItem) {
         alert("Could not find the original item to settle.");
         return;
     }
 
-    // 1. Mark the original debtor/creditor as Settled
-    const updatePayload = { ...originalItem, status: 'Settled' };
-
-    // 2. Create a new transaction for the settlement
-    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
-    const settlePaymentType = document.getElementById('settlePaymentType').value;
-    const transactionData = {
-        date: document.getElementById('settleDate').value,
-        name: originalItem.name,
-        description: document.getElementById('settleDescription').value,
-        status: 'Done',
-        in_payments: [],
-        out_payments: []
+    // Step 1: Update the item with settlement details and "Settled" status
+    const updatePayload = {
+        ...originalItem,
+        status: 'Settled',
+        // Store settlement details directly on the item
+        settled_date: document.getElementById('settleDate').value,
+        settled_amount: parseFloat(document.getElementById('settleAmount').value) || 0,
+        settled_payment_type: document.getElementById('settlePaymentType').value,
+        settled_description: document.getElementById('settleDescription').value
     };
 
-    if (settleType === 'debtor') { // Money comes IN when a debtor pays you back
-        transactionData.in_payments.push({ amount: settleAmount, type: settlePaymentType });
-    } else { // Money goes OUT when you pay a creditor back
-        transactionData.out_payments.push({ amount: settleAmount, type: settlePaymentType });
-    }
-
     try {
-        // Save both updates
-        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: updatePayload });
-        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: transactionData });
+        // Save the updated creditor/debtor
+        const updatedItem = await apiCall('addOrUpdate', { table: `${settleType}s`, data: updatePayload });
 
         // Update local data
-        transactions.unshift(savedTx);
         if (settleType === 'debtor') {
-            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
+            debtors = debtors.map(d => d.id === editingId ? updatedItem : d);
         } else {
-            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
+            creditors = creditors.map(c => c.id === editingId ? updatedItem : c);
         }
 
-        // Re-render everything
-        init();
+        // Re-render everything to reflect changes in statements
+        makeStatements(); 
+        renderDebtors();
+        renderCreditors();
+
         if (modals.settle) modals.settle.style.display = 'none';
-        alert(`${settleType} settled successfully and a transaction was recorded.`);
+        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
 
     } catch (error) {
         console.error("Error settling debt:", error);
