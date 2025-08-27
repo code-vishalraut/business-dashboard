@@ -1270,9 +1270,9 @@ function numberToWords(num) {
     const a = [ '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen' ];
     const b = [ '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety' ];
     if ((num = num.toString()).length > 5) return 'Amount too large';
+    let str = '';
     let n = ('00000' + num).substr(-5).match(/^(\d{2})(\d{3})$/);
     if (!n) return '';
-    let str = '';
     str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + ' Thousand ' : '';
     str += (n[2] != 0) ? ((str != '') ? ' ' : '') + (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) : '';
     return str.trim() + ' Rupees only';
@@ -1425,26 +1425,47 @@ function setupRemoveSplitButtons() {
 }
 
 // --- Settle Debt Logic ---
-async function openSettleModal(type, id) {
+function openSettleModal(type, id) {
+    console.log('Opening settle modal for:', type, id);
     updatePaymentTypeOptions(); // Ensure payment options are fresh
     const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
-    if (!item) return;
+    if (!item) {
+        console.error('Item not found:', type, id);
+        return;
+    }
 
-    document.getElementById('settleModalTitle').textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-    document.getElementById('settleName').textContent = item.name || '';
-    document.getElementById('settleOriginalAmount').textContent = Number(item.amount).toFixed(2);
-    document.getElementById('settleAmount').value = item.amount;
-    document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
-    document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
+    const settleModal = document.getElementById('settleModal');
+    if (!settleModal) {
+        console.error('Settle modal not found in DOM');
+        return;
+    }
 
-    // Set settle date default to now
-    document.getElementById('settleDate').value = new Date().toISOString().slice(0, 16);
+    const titleElem = document.getElementById('settleModalTitle');
+    const nameElem = document.getElementById('settleName');
+    const amountElem = document.getElementById('settleOriginalAmount');
+    const settleAmountElem = document.getElementById('settleAmount');
+    const paymentTypeElem = document.getElementById('settlePaymentType');
+    const descElem = document.getElementById('settleDescription');
+    const dateElem = document.getElementById('settleDate');
+
+    if (titleElem) titleElem.textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    if (nameElem) nameElem.textContent = item.name || '';
+    if (amountElem) amountElem.textContent = Number(item.amount).toFixed(2);
+    if (settleAmountElem) settleAmountElem.value = item.amount;
+    if (paymentTypeElem) paymentTypeElem.value = item.payment_type || 'Cash';
+    if (descElem) descElem.value = `Settlement for ${item.name}`;
+    if (dateElem) dateElem.value = new Date().toISOString().slice(0, 16);
 
     // Store type and id for the submit handler
-    forms.settle.dataset.settleType = type;
-    forms.settle.dataset.editingId = id;
+    if (forms.settle) {
+        forms.settle.dataset.settleType = type;
+        forms.settle.dataset.editingId = id;
+    }
+
+    console.log('Showing settle modal');
     showModal('settle');
 }
+
 
 // --- Settle Form Submit: Only update status, do NOT create a transaction (fix double counting) ---
 forms.settle.addEventListener('submit', async function (e) {
@@ -2338,29 +2359,49 @@ function renderBankStatement(bankName) {
 }
 
 // --- Settle Debt Logic ---
-async function openSettleModal(type, id) {
+function openSettleModal(type, id) {
+    console.log('Opening settle modal for:', type, id);
     updatePaymentTypeOptions(); // Ensure payment options are fresh
     const item = type === 'debtor' ? debtors.find(d => d.id === id) : creditors.find(c => c.id === id);
-    if (!item) return;
+    if (!item) {
+        console.error('Item not found:', type, id);
+        return;
+    }
 
-    document.getElementById('settleModalTitle').textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-    document.getElementById('settleName').textContent = item.name || '';
-    document.getElementById('settleOriginalAmount').textContent = Number(item.amount).toFixed(2);
-    document.getElementById('settleAmount').value = item.amount;
-    document.getElementById('settlePaymentType').value = item.payment_type || 'Cash';
-    document.getElementById('settleDescription').value = `Settlement for ${item.name}`;
+    const settleModal = document.getElementById('settleModal');
+    if (!settleModal) {
+        console.error('Settle modal not found in DOM');
+        return;
+    }
 
-    // Set settle date default to now
-    document.getElementById('settleDate').value = new Date().toISOString().slice(0, 16);
+    const titleElem = document.getElementById('settleModalTitle');
+    const nameElem = document.getElementById('settleName');
+    const amountElem = document.getElementById('settleOriginalAmount');
+    const settleAmountElem = document.getElementById('settleAmount');
+    const paymentTypeElem = document.getElementById('settlePaymentType');
+    const descElem = document.getElementById('settleDescription');
+    const dateElem = document.getElementById('settleDate');
+
+    if (titleElem) titleElem.textContent = `Settle ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    if (nameElem) nameElem.textContent = item.name || '';
+    if (amountElem) amountElem.textContent = Number(item.amount).toFixed(2);
+    if (settleAmountElem) settleAmountElem.value = item.amount;
+    if (paymentTypeElem) paymentTypeElem.value = item.payment_type || 'Cash';
+    if (descElem) descElem.value = `Settlement for ${item.name}`;
+    if (dateElem) dateElem.value = new Date().toISOString().slice(0, 16);
 
     // Store type and id for the submit handler
-    forms.settle.dataset.settleType = type;
-    forms.settle.dataset.editingId = id;
+    if (forms.settle) {
+        forms.settle.dataset.settleType = type;
+        forms.settle.dataset.editingId = id;
+    }
+
+    console.log('Showing settle modal');
     showModal('settle');
 }
 
 
-// Replace this entire block
+// --- Settle Form Submit: Only update status, do NOT create a transaction (fix double counting) ---
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
