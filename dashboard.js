@@ -117,14 +117,6 @@ function setupRealtimeListeners() {
     // This function can be expanded later to handle live data updates without refreshing.
 }
 
-
-// =================================================================
-// YOUR ORIGINAL CODE - MODIFIED TO WORK WITH SUPABASE
-// =================================================================
-
-// NOTE: The PIN login function is removed as it's replaced by Supabase login.
-// NOTE: All 'localStorage.setItem' and 'localStorage.getItem' calls are removed.
-
 // Global variables and element references with null checks
 const tabs = { home: document.getElementById('tabHome'), main: document.getElementById('tabMain'), expenses: document.getElementById('tabExpenses'), debtors: document.getElementById('tabDebtors'), creditors: document.getElementById('tabCreditors'), account: document.getElementById('tabAccount'), cash: document.getElementById('tabCash'), export: document.getElementById('tabExport') };
 const tabContents = { home: document.getElementById('tabHomeContent'), main: document.getElementById('tabMainContent'), expenses: document.getElementById('tabExpensesContent'), debtors: document.getElementById('tabDebtorsContent'), creditors: document.getElementById('tabCreditorsContent'), account: document.getElementById('tabAccountContent'), cash: document.getElementById('tabCashContent'), export: document.getElementById('tabExportContent') };
@@ -271,11 +263,6 @@ buttons.addBank.addEventListener('click', async () => {
 });
 
 
-// ... PASTE ALL YOUR ORIGINAL FUNCTIONS HERE ...
-// (`renderCategoryFilter`, `renderTransactions`, `renderExpenses`, `renderDebtors`, etc.)
-// Make the necessary modifications as shown in the examples below:
-
-
 // EXAMPLE MODIFICATION for renderTransactions
 function renderTransactions() {
     tables.transactionsBody.innerHTML = transactions
@@ -342,70 +329,117 @@ if (forms.expense) {
 }
 
 // ADDED: forms.debtor.addEventListener with Supabase integration
-if (forms.debtor) {
-    forms.debtor.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const split = Array.from(document.querySelectorAll('#debtorPayContainer .split-payment-row')).map(r => ({
-            amount: parseFloat(r.querySelector('.debtorAmount').value) || 0,
-            type: r.querySelector('.debtorPaymentType').value
-        })).filter(p => p.amount > 0);
-        const total = split.reduce((s, p) => s + p.amount, 0);
-        const d = {
-            date: document.getElementById('debtorDate').value,
-            name: document.getElementById('debtorName').value,
-            phone: document.getElementById('debtorPhone').value,
-            amount: total,
-            payment_type: split.map(p => p.type).join(', '),
-            split_payments: split,
-            description: document.getElementById('debtorDesc').value,
-            status: 'Pending'
-        };
-        try {
-            await apiCall('addOrUpdate', { table: 'debtors', data: d });
-            debtors.unshift(d);
-            renderDebtors();
-            makeStatements();
-            this.reset();
-            modals.debtor.style.display = 'none';
-        } catch (error) {
-            console.error("Error saving debtor:", error);
-            alert('Failed to save debtor. Please check the console.');
-        }
-    });
-}
+forms.debtor.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("debtor-name").value;
+  const amount = parseFloat(document.getElementById("debtor-amount").value);
+  const mode = document.getElementById("debtor-mode").value;
+  const date = document.getElementById("debtor-date").value;
 
-// ADDED: forms.creditor.addEventListener with Supabase integration
-if (forms.creditor) {
-    forms.creditor.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const split = Array.from(document.querySelectorAll('#creditorPayContainer .split-payment-row')).map(r => ({
-            amount: parseFloat(r.querySelector('.creditorAmount').value) || 0,
-            type: r.querySelector('.creditorPaymentType').value
-        })).filter(p => p.amount > 0);
-        const total = split.reduce((s, p) => s + p.amount, 0);
-        const c = {
-            date: document.getElementById('creditorDate').value,
-            name: document.getElementById('creditorName').value,
-            phone: document.getElementById('creditorPhone').value,
-            amount: total,
-            payment_type: split.map(p => p.type).join(', '),
-            split_payments: split,
-            description: document.getElementById('creditorDesc').value,
-            status: 'Pending'
-        };
-        try {
-            await apiCall('addOrUpdate', { table: 'creditors', data: c });
-            creditors.unshift(c);
-            renderCreditors();
-            makeStatements();
-            this.reset();
-            modals.creditor.style.display = 'none';
-        } catch (error) {
-            console.error("Error saving creditor:", error);
-            alert('Failed to save creditor. Please check the console.');
-        }
+  try {
+    await apiCall("debtors", "insert", { name, amount, date, mode, settled: false });
+
+    // Money given to debtor → minus entry
+    await apiCall("statements", "insert", {
+      date,
+      type: "Debtor",
+      description: name,
+      amount: -amount,
+      mode,
     });
-}
+
+    loadDebtors();
+    makeStatements();
+    updateBalances();
+  } catch (err) {
+    console.error("Error adding debtor:", err);
+  }
+});
+
+forms.debtorSettle.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = forms.debtorSettle.dataset.id;
+  const amount = parseFloat(document.getElementById("debtor-settle-amount").value);
+  const mode = document.getElementById("debtor-settle-mode").value;
+  const date = document.getElementById("debtor-settle-date").value;
+
+  try {
+    await apiCall("debtors", "update", { id, settled: true });
+
+    // Money received back → plus entry
+    await apiCall("statements", "insert", {
+      date,
+      type: "Debtor Settlement",
+      description: "Debtor settled",
+      amount: +amount,
+      mode,
+    });
+
+    closeModal("debtor-settle-modal");
+    loadDebtors();
+    makeStatements();
+    updateBalances();
+  } catch (err) {
+    console.error("Error settling debtor:", err);
+  }
+});
+
+
+forms.creditor.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("creditor-name").value;
+  const amount = parseFloat(document.getElementById("creditor-amount").value);
+  const mode = document.getElementById("creditor-mode").value;
+  const date = document.getElementById("creditor-date").value;
+
+  try {
+    await apiCall("creditors", "insert", { name, amount, date, mode, settled: false });
+
+    // Loan received → plus entry
+    await apiCall("statements", "insert", {
+      date,
+      type: "Creditor",
+      description: name,
+      amount: +amount,
+      mode,
+    });
+
+    loadCreditors();
+    makeStatements();
+    updateBalances();
+  } catch (err) {
+    console.error("Error adding creditor:", err);
+  }
+});
+
+forms.settle.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = forms.settle.dataset.id;
+  const amount = parseFloat(document.getElementById("settle-amount").value);
+  const mode = document.getElementById("settle-mode").value;
+  const date = document.getElementById("settle-date").value;
+
+  try {
+    await apiCall("creditors", "update", { id, settled: true });
+
+    // Loan repaid → minus entry (new statement)
+    await apiCall("statements", "insert", {
+      date,
+      type: "Creditor Settlement",
+      description: "Creditor settled",
+      amount: -amount,
+      mode,
+    });
+
+    closeModal("settle-modal");
+    loadCreditors();
+    makeStatements();
+    updateBalances();
+  } catch (err) {
+    console.error("Error settling creditor:", err);
+  }
+});
+
 
 if (forms.transfer) {
     forms.transfer.addEventListener('submit', async function (e) {
@@ -429,9 +463,6 @@ if (forms.transfer) {
         }
     });
 }
-// You will need to apply similar changes to all other functions that save or edit data.
-// Replace `localStorage.setItem` with `apiCall`.
-// Replace `data-index` with `data-id`.
 
 // Your original init function, now called by the new logic
 function init() {
@@ -1446,62 +1477,6 @@ async function openSettleModal(type, id) {
     showModal('settle');
 }
 
-// --- Settle Form Submit: Only update status, do NOT create a transaction (fix double counting) ---
-forms.settle.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const editingId = this.dataset.editingId;
-    const settleType = this.dataset.settleType;
-    const originalItem = settleType === 'debtor' ? debtors.find(d => d.id === editingId) : creditors.find(c => c.id === editingId);
-
-    if (!originalItem) {
-        alert("Could not find the original item to settle.");
-        return;
-    }
-
-    // 1. Mark the original debtor/creditor as Settled
-    const updatePayload = { ...originalItem, status: 'Settled' };
-
-    // 2. Create a new transaction for the settlement
-    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
-    const settlePaymentType = document.getElementById('settlePaymentType').value;
-    const transactionData = {
-        date: document.getElementById('settleDate').value,
-        name: originalItem.name,
-        description: document.getElementById('settleDescription').value,
-        status: 'Done',
-        in_payments: [],
-        out_payments: []
-    };
-
-    if (settleType === 'debtor') { // Money comes IN when a debtor pays you back
-        transactionData.in_payments.push({ amount: settleAmount, type: settlePaymentType });
-    } else { // Money goes OUT when you pay a creditor back
-        transactionData.out_payments.push({ amount: settleAmount, type: settlePaymentType });
-    }
-
-    try {
-        // Save both updates
-        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: updatePayload });
-        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: transactionData });
-
-        // Update local data
-        transactions.unshift(savedTx);
-        if (settleType === 'debtor') {
-            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
-        } else {
-            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
-        }
-
-        // Re-render everything
-        init();
-        if (modals.settle) modals.settle.style.display = 'none';
-        alert(`${settleType} settled successfully and a transaction was recorded.`);
-
-    } catch (error) {
-        console.error("Error settling debt:", error);
-        alert('Failed to settle debt.');
-    }
-});
 
 
 // === AI Assistant Minimize/Maximize ===
