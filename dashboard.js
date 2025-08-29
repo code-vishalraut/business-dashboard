@@ -2002,6 +2002,57 @@ function makeStatements() {
     updateTrendChart();
     updateBankPieChart();
 }
+function renderAllStatements(allBankNames) {
+    // --- कैश स्टेटमेंट को रेंडर करें ---
+    cashStatements.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let runningCash = 0;
+    const cashRows = cashStatements.map(entry => {
+        runningCash += (Number(entry.in) || 0) - (Number(entry.out) || 0);
+        const d = new Date(entry.date);
+        const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        return `<tr>
+            <td>${dateStr}</td>
+            <td>${entry.description || ''}</td>
+            <td>₹${(Number(entry.in) || 0).toFixed(2)}</td>
+            <td>₹${(Number(entry.out) || 0).toFixed(2)}</td>
+            <td>₹${runningCash.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+    
+    if (tables.cashStatementBody) tables.cashStatementBody.innerHTML = cashRows;
+    if (stats.cash) stats.cash.textContent = runningCash.toFixed(2);
+    const cashBalanceElem = document.getElementById('cashBalanceCash');
+    if (cashBalanceElem) cashBalanceElem.textContent = runningCash.toFixed(2);
+
+    // --- बैंक बैलेंस की लिस्ट को रेंडर करें ---
+    const bankBalancesElem = document.getElementById('bankBalances');
+    let totalBankBalance = 0;
+    if (bankBalancesElem) {
+        const bankItems = Array.from(allBankNames).sort().map(bankName => {
+            const statements = bankStatements[bankName] || [];
+            const balance = statements.reduce((bal, entry) => bal + (Number(entry.in) || 0) - (Number(entry.out) || 0), 0);
+            totalBankBalance += balance;
+            return `<div class="bank-balance-item" data-bank="${bankName}" style="cursor:pointer; padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+                        <span>${bankName}</span>
+                        <span>₹${balance.toFixed(2)}</span>
+                    </div>`;
+        }).join('');
+        bankBalancesElem.innerHTML = bankItems || '<p>No bank accounts found.</p>';
+
+        // ▼▼▼ यह महत्वपूर्ण हिस्सा जोड़ा गया है ▼▼▼
+        // बैंक लिस्ट पर क्लिक इवेंट लिस्नर लगाएँ
+        bankBalancesElem.onclick = (e) => {
+            const item = e.target.closest('[data-bank]');
+            if (item) {
+                const bankName = item.getAttribute('data-bank');
+                renderBankStatement(bankName);
+            }
+        };
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    }
+
+    if (stats.bank) stats.bank.textContent = totalBankBalance.toFixed(2);
+}
 
 
 function renderBankStatement(bankName) {
