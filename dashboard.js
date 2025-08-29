@@ -344,8 +344,9 @@ forms.debtor.addEventListener("submit", async (e) => {
   const date = document.getElementById("debtorDate").value;
 
   try {
-    await apiCall("debtors", "insert", { name, amount, date, payment_type: mode });
-
+    // Also add status: 'Pending' here for consistency
+    await apiCall("debtors", "insert", { name, amount, date, payment_type: mode, status: 'Pending' });
+    
     // Debtor Add → minus entry
     await apiCall("statements", "insert", {
       date,
@@ -376,7 +377,7 @@ forms.creditor.addEventListener("submit", async (e) => {
   const date = document.getElementById("creditorDate").value;
 
   try {
-    await apiCall("creditors", "insert", { name, amount, date, payment_type: mode });
+    await apiCall("creditors", "insert", { name, amount, date, payment_type: mode, status: 'Pending' });
 
     // Creditor Add → plus entry
     await apiCall("statements", "insert", {
