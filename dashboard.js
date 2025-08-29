@@ -367,20 +367,20 @@ forms.creditor.addEventListener("submit", async (e) => {
   const amount = parseFloat(document.querySelector(".creditorAmount").value);
   const mode = document.querySelector(".creditorPaymentType").value;
   const date = document.getElementById("creditorDate").value;
-  // This is the new line that was missing
   const description = document.getElementById("creditorDesc").value; 
 
   try {
-    // We now include the 'description' when saving
+    // This code correctly creates ONLY the creditor record.
     const newCreditor = await apiCall("creditors", "insert", { 
         name, 
         amount, 
         date, 
         payment_type: mode, 
-        description: description, // This was added
+        description: description,
         status: 'Pending' 
     });
 
+    // It then updates the UI correctly.
     creditors.unshift(newCreditor);
     makeStatements();
     renderCreditors();
@@ -388,6 +388,7 @@ forms.creditor.addEventListener("submit", async (e) => {
     
   } catch (err) {
     console.error("Error adding creditor:", err);
+    alert("Failed to add creditor.");
   }
 });
 
