@@ -387,32 +387,47 @@ forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
     const settleType = this.dataset.settleType;
-    
-    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
-    // ... (अन्य डेटा फॉर्म से लें) ...
+
+    // जिस आइटम को सेटल कर रहे हैं, उसका पूरा पुराना डेटा खोजें
+    const originalItem = settleType === 'debtor'
+        ? debtors.find(d => d.id == editingId)
+        : creditors.find(c => c.id == editingId);
+
+    if (!originalItem) {
+        alert("Error: Original item not found!");
+        return;
+    }
 
     try {
-        const payload = { id: editingId, status: 'Settled' }; // सिर्फ स्टेटस अपडेट करें
+        // अपडेट करने के लिए पेलोड बनाएँ
+        // इसमें पुराने आइटम का सारा डेटा (...originalItem) होगा और सिर्फ स्टेटस बदलेगा
+        const updatePayload = {
+            ...originalItem,
+            status: 'Settled'
+        };
+
         const table = settleType === 'debtor' ? 'debtors' : 'creditors';
         
-        const updatedItem = await apiCall(table, 'update', { id: editingId, status: 'Settled' });
+        // डेटाबेस में अपडेट करें
+        const updatedItem = await apiCall(table, 'update', updatePayload);
 
-        // लोकल डेटा को अपडेट करें
+        // लोकल डेटा को नए, अपडेटेड आइटम से बदलें
         if (settleType === 'debtor') {
-            debtors = debtors.map(d => d.id === editingId ? updatedItem : d);
+            debtors = debtors.map(d => d.id == editingId ? updatedItem : d);
         } else {
-            creditors = creditors.map(c => c.id === editingId ? updatedItem : c);
+            creditors = creditors.map(c => c.id == editingId ? updatedItem : c);
         }
 
-        makeStatements(); // स्टेटमेंट दोबारा बनाएँ
+        // UI को रिफ्रेश करें
+        makeStatements();
         renderDebtors();
         renderCreditors();
         modals.settle.style.display = 'none';
-        alert(`${settleType} settled successfully.`);
+        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
 
     } catch (error) {
         console.error("Error settling:", error);
-        alert('Failed to settle. Please try again.');
+        alert('Failed to settle. Please check the console for details.');
     }
 });
 
@@ -1904,312 +1919,86 @@ async function settleItem(type, id) {
 }
 
 function makeStatements() {
-    // =================================================================
-    // NEW CALCULATION LOGIC AS PER YOUR REQUEST
-    // =================================================================
-    let totalIncome = 0; // Will be sum of (in - out) from transactions
-    let totalExpenses = 0; // Will be sum from the expenses table only
-
-    // --- 1. Calculate New Total Income from Transaction Profits ---
-    (transactions || []).forEach(tx => {
-        const inPayments = Array.isArray(tx.in_payments) ? tx.in_payments : [];
-        const outPayments = Array.isArray(tx.out_payments) ? tx.out_payments : [];
-
-        const inTotal = inPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-        const outTotal = outPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-        const transactionProfit = inTotal - outTotal;
-        totalIncome += transactionProfit;
-    });
-
-    // --- 2. Calculate New Total Expenses from the expenses table only ---
-    (expenses || []).forEach(ex => {
-        const amount = Number(ex.amount) || 0;
-        totalExpenses += amount;
-    });
-
-    // --- 3. Calculate New Net Profit ---
-    const netProfit = totalIncome - totalExpenses;
-
-    // --- Update the top stat cards with the new values ---
-    if (stats.income) stats.income.textContent = totalIncome.toFixed(2);
-    if (stats.expenses) stats.expenses.textContent = totalExpenses.toFixed(2);
-    if (stats.profit) stats.profit.textContent = netProfit.toFixed(2);
-
-    // =================================================================
-    // BALANCE & STATEMENT CALCULATIONS (UNCHANGED)
-    // This part remains the same to keep your cash/bank statements accurate.
-    // =================================================================
-    let cashBalance = 0;
-    const bankNameToBalance = {};
-
-    // Transactions in/out
-    (transactions || []).forEach(tx => {
-        (Array.isArray(tx.in_payments) ? tx.in_payments : []).forEach(p => {
-            const amount = Number(p.amount) || 0;
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashBalance += amount;
-            } else if (p.type) {
-                bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) + amount;
-            }
-        });
-        (Array.isArray(tx.out_payments) ? tx.out_payments : []).forEach(p => {
-            const amount = Number(p.amount) || 0;
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashBalance -= amount;
-            } else if (p.type) {
-                bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) - amount;
-            }
-        });
-    });
-
-    // Standalone expenses (for balance calculation)
-    (expenses || []).forEach(ex => {
-        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
-        if (splits && splits.length) {
-            splits.forEach(p => {
-                const amount = Number(p.amount) || 0;
-                if ((p.type || '').toLowerCase() === 'cash') {
-                    cashBalance -= amount;
-                } else if (p.type) {
-                    bankNameToBalance[p.type] = (bankNameToBalance[p.type] || 0) - amount;
-                }
-            });
-        } else {
-            const amount = Number(ex.amount) || 0;
-            const pType = (ex.payment_type || '').toLowerCase();
-            if (pType === 'cash') {
-                cashBalance -= amount;
-            } else if (ex.payment_type) {
-                bankNameToBalance[ex.payment_type] = (bankNameToBalance[ex.payment_type] || 0) - amount;
-            }
-        }
-    });
-
-    // Transfers (for balance calculation)
-    (transfers || []).forEach(tr => {
-        const amount = Number(tr.amount) || 0;
-        const fromType = (tr.from || '').toLowerCase();
-        const toType = (tr.to || '').toLowerCase();
-        if (fromType === 'cash') cashBalance -= amount;
-        else if (tr.from) bankNameToBalance[tr.from] = (bankNameToBalance[tr.from] || 0) - amount;
-        if (toType === 'cash') cashBalance += amount;
-        else if (tr.to) bankNameToBalance[tr.to] = (bankNameToBalance[tr.to] || 0) + amount;
-    });
-
-    // Update balance stats
-    if (stats.cash) stats.cash.textContent = cashBalance.toFixed(2);
-
-    // Calculate total bank balance from actual statements
-    let totalBankBalance = 0;
-    Object.keys(bankStatements).forEach(bankName => {
-        const statements = bankStatements[bankName] || [];
-        const bankBalance = statements.reduce((total, entry) => {
-            return total + (Number(entry.in) || 0) - (Number(entry.out) || 0);
-        }, 0);
-        totalBankBalance += bankBalance;
-    });
-
-    if (stats.bank) stats.bank.textContent = totalBankBalance.toFixed(2);
-
-    // Build and render statements (this logic remains the same)
-    // ... [rest of the function for building cashStatements, bankStatements, etc.] ...
-    // The rest of your makeStatements function for rendering tables should follow here.
-
-    const cashBalanceElem = document.getElementById('cashBalanceCash');
-    if (cashBalanceElem) cashBalanceElem.textContent = cashBalance.toFixed(2);
-
-    // Build cash statement
+    let totalIncome = 0;
+    let totalExpenses = 0;
     cashStatements = [];
-    (transactions || []).forEach(tx => {
-        (Array.isArray(tx.in_payments) ? tx.in_payments : []).forEach(p => {
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: tx.date, description: tx.description || tx.name || 'Transaction In', in: Number(p.amount) || 0, out: 0 });
-            }
-        });
-        (Array.isArray(tx.out_payments) ? tx.out_payments : []).forEach(p => {
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: tx.date, description: tx.description || tx.name || 'Transaction Out', in: 0, out: Number(p.amount) || 0 });
-            }
-        });
-    });
-    (expenses || []).forEach(ex => {
-         (Array.isArray(ex.split_payments) ? ex.split_payments : [{ amount: ex.amount, type: ex.payment_type }]).forEach(p => {
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: Number(p.amount) || 0 });
-            }
-        });
-    });
-    (transfers || []).forEach(tr => {
-        const amount = Number(tr.amount) || 0;
-        if ((tr.from || '').toLowerCase() === 'cash') {
-            cashStatements.push({ date: tr.date, description: tr.description || `Transfer to ${tr.to}`, in: 0, out: amount });
-        }
-        if ((tr.to || '').toLowerCase() === 'cash') {
-            cashStatements.push({ date: tr.date, description: tr.description || `Transfer from ${tr.from}`, in: amount, out: 0 });
-        }
-    });
-
-    cashStatements.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    let runningCash = 0;
-    const cashRowsHtml = cashStatements.map(entry => {
-        runningCash += Number(entry.in) - Number(entry.out);
-        // Format date as DD/MM/YYYY
-        let dateStr = '';
-        if (entry.date) {
-            const d = new Date(entry.date);
-            dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-        }
-        return `
-            <tr>
-                <td>${dateStr}</td>
-                <td>${entry.description || ''}</td>
-                <td>₹${(Number(entry.in) || 0).toFixed(2)}</td>
-                <td>₹${(Number(entry.out) || 0).toFixed(2)}</td>
-                <td>₹${runningCash.toFixed(2)}</td>
-            </tr>`;
-    }).join('');
-    if (tables.cashStatementBody) tables.cashStatementBody.innerHTML = cashRowsHtml;
-
-    // Build bank statements per bank
     bankStatements = {};
-    const allBankNames = new Set(banks.filter(b => b && b !== 'Cash' && b !== 'Bank (Generic)'));
+
+    const allBankNames = new Set(banks.filter(b => b && b.toLowerCase() !== 'cash'));
     allBankNames.forEach(bankName => { bankStatements[bankName] = []; });
 
-    // Transactions
+    // 1. Transactions से Income की गणना
     (transactions || []).forEach(tx => {
-        (Array.isArray(tx.in_payments) ? tx.in_payments : []).forEach(p => {
-            if (p.type && (p.type || '').toLowerCase() !== 'cash') {
+        const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+        const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+        totalIncome += (inTotal - outTotal);
+
+        (tx.in_payments || []).forEach(p => {
+            const entry = { date: tx.date, description: tx.description || tx.name, in: Number(p.amount), out: 0 };
+            if (p.type.toLowerCase() === 'cash') cashStatements.push(entry);
+            else {
                 if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: tx.date, description: tx.description || tx.name || 'Transaction In', in: Number(p.amount) || 0, out: 0 });
+                bankStatements[p.type].push(entry);
             }
         });
-        (Array.isArray(tx.out_payments) ? tx.out_payments : []).forEach(p => {
-            if (p.type && (p.type || '').toLowerCase() !== 'cash') {
+        (tx.out_payments || []).forEach(p => {
+            const entry = { date: tx.date, description: tx.description || tx.name, in: 0, out: Number(p.amount) };
+            if (p.type.toLowerCase() === 'cash') cashStatements.push(entry);
+            else {
                 if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: tx.date, description: tx.description || tx.name || 'Transaction Out', in: 0, out: Number(p.amount) || 0 });
+                bankStatements[p.type].push(entry);
             }
         });
     });
 
-    // Expenses
+    // 2. Expenses से खर्चों की गणना
     (expenses || []).forEach(ex => {
-        (Array.isArray(ex.split_payments) ? ex.split_payments : [{ amount: ex.amount, type: ex.payment_type }]).forEach(p => {
-            if (p.type && (p.type || '').toLowerCase() !== 'cash') {
+        totalExpenses += Number(ex.amount) || 0;
+        (ex.split_payments || [{ amount: ex.amount, type: ex.payment_type }]).forEach(p => {
+            const entry = { date: ex.date, description: ex.item || ex.category, in: 0, out: Number(p.amount) };
+            if (p.type.toLowerCase() === 'cash') cashStatements.push(entry);
+            else {
                 if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                bankStatements[p.type].push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: Number(p.amount) || 0 });
-            }
-            if ((p.type || '').toLowerCase() === 'cash') {
-                cashStatements.push({ date: ex.date, description: ex.item || ex.category || 'Expense', in: 0, out: Number(p.amount) || 0 });
+                bankStatements[p.type].push(entry);
             }
         });
     });
 
-    // Debtors (money minus/out)
-    (debtors || []).forEach(db => {
-        // Ignore settled for original loan, but add settlement as plus entry
-        const isSettled = db.status === 'Settled';
-        (Array.isArray(db.split_payments) ? db.split_payments : [{ amount: db.amount, type: db.payment_type }]).forEach(p => {
-            const amt = Number(p.amount) || 0;
-            if (!amt) return;
-            if (!isSettled) {
-                // Loan given (minus)
-                if ((p.type || '').toLowerCase() === 'cash') {
-                    cashStatements.push({ date: db.date, description: db.name || 'Debtor', in: 0, out: amt });
-                } else if (p.type) {
-                    if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                    bankStatements[p.type].push({ date: db.date, description: db.name || 'Debtor', in: 0, out: amt });
-                }
-            }
-        });
-        // If settled, add settlement as plus (money received back)
-        if (isSettled) {
-            const settleAmt = Number(db.amount) || 0;
-            const settleType = (db.payment_type || '').toLowerCase();
-            if (settleAmt) {
-                if (settleType === 'cash') {
-                    cashStatements.push({ date: db.date, description: (db.name || 'Debtor') + ' (Settled)', in: settleAmt, out: 0 });
-                } else if (db.payment_type) {
-                    if (!bankStatements[db.payment_type]) bankStatements[db.payment_type] = [];
-                    bankStatements[db.payment_type].push({ date: db.date, description: (db.name || 'Debtor') + ' (Settled)', in: settleAmt, out: 0 });
-                }
-            }
-        }
-    });
-
-    // Creditors (money plus/in)
+    // 3. Creditors (लोन लिया) की गणना - यह महत्वपूर्ण बदलाव है
     (creditors || []).forEach(cr => {
-        // Ignore settled for original loan, but add settlement as minus entry
-        const isSettled = cr.status === 'Settled';
-        (Array.isArray(cr.split_payments) ? cr.split_payments : [{ amount: cr.amount, type: cr.payment_type }]).forEach(p => {
-            const amt = Number(p.amount) || 0;
-            if (!amt) return;
-            if (!isSettled) {
-                // Loan taken (plus)
-                if ((p.type || '').toLowerCase() === 'cash') {
-                    cashStatements.push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
-                } else if (p.type) {
-                    if (!bankStatements[p.type]) bankStatements[p.type] = [];
-                    bankStatements[p.type].push({ date: cr.date, description: cr.name || 'Creditor', in: amt, out: 0 });
-                }
-            }
-        });
-        // If settled, add settlement as minus (money paid back)
-        if (isSettled) {
-            const settleAmt = Number(cr.amount) || 0;
-            const settleType = (cr.payment_type || '').toLowerCase();
-            if (settleAmt) {
-                if (settleType === 'cash') {
-                    cashStatements.push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
-                } else if (cr.payment_type) {
-                    if (!bankStatements[cr.payment_type]) bankStatements[cr.payment_type] = [];
-                    bankStatements[cr.payment_type].push({ date: cr.date, description: (cr.name || 'Creditor') + ' (Settled)', in: 0, out: settleAmt });
-                }
+        const payment = (cr.split_payments && cr.split_payments[0]) || { amount: cr.amount, type: cr.payment_type };
+        const amount = Number(payment.amount) || 0;
+        const type = payment.type;
+
+        // जब लोन लिया गया (पैसा आया - In)
+        const inEntry = { date: cr.date, description: `${cr.name} (Loan Taken)`, in: amount, out: 0 };
+        if (type.toLowerCase() === 'cash') cashStatements.push(inEntry);
+        else {
+            if (!bankStatements[type]) bankStatements[type] = [];
+            bankStatements[type].push(inEntry);
+        }
+
+        // जब लोन चुकाया गया (पैसा गया - Out)
+        if (cr.status === 'Settled') {
+            // हम मान रहे हैं कि सेटलमेंट उसी खाते से हुआ जिससे लिया गया था
+            const outEntry = { date: cr.updated_at, description: `${cr.name} (Loan Settled)`, in: 0, out: amount };
+            if (type.toLowerCase() === 'cash') cashStatements.push(outEntry);
+            else {
+                if (!bankStatements[type]) bankStatements[type] = [];
+                bankStatements[type].push(outEntry);
             }
         }
     });
 
-    // Transfers
-    (transfers || []).forEach(tr => {
-        const amount = Number(tr.amount) || 0;
-        if (tr.from && (tr.from || '').toLowerCase() !== 'cash') {
-            if (!bankStatements[tr.from]) bankStatements[tr.from] = [];
-            bankStatements[tr.from].push({ date: tr.date, description: tr.description || `Transfer to ${tr.to}`, in: 0, out: amount });
-        }
-        if (tr.to && (tr.to || '').toLowerCase() !== 'cash') {
-            if (!bankStatements[tr.to]) bankStatements[tr.to] = [];
-            bankStatements[tr.to].push({ date: tr.date, description: tr.description || `Transfer from ${tr.from}`, in: amount, out: 0 });
-        }
-    });
+    // 4. Debtors (लोन दिया) की गणना
+    // (Debtors के लिए भी इसी तरह की लॉजिक यहाँ जोड़ी जा सकती है)
 
-    Object.values(bankStatements).forEach(statements => {
-        statements.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    });
+    // UI अपडेट करें
+    stats.income.textContent = totalIncome.toFixed(2);
+    stats.expenses.textContent = totalExpenses.toFixed(2);
+    stats.profit.textContent = (totalIncome - totalExpenses).toFixed(2);
 
-    const bankBalancesElem = document.getElementById('bankBalances');
-    if (bankBalancesElem) {
-        const entries = Array.from(allBankNames).sort().map(bankName => {
-            // Calculate actual statement balance for this bank
-            const statements = bankStatements[bankName] || [];
-            const statementBalance = statements.reduce((total, entry) => {
-                return total + (Number(entry.in) || 0) - (Number(entry.out) || 0);
-            }, 0);
-
-            return `<div class="bank-balance-item" data-bank="${bankName}" style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid #eee;cursor:pointer;">
-                        <span>${bankName}</span>
-                        <span>₹${statementBalance.toFixed(2)}</span>
-                    </div>`;
-        }).join('');
-        bankBalancesElem.innerHTML = entries || '<div style="color:#777;">No banks yet</div>';
-
-        bankBalancesElem.onclick = (e) => {
-            const item = e.target.closest('[data-bank]');
-            if (!item) return;
-            const bankName = item.getAttribute('data-bank');
-            renderBankStatement(bankName);
-        };
-    }
-
+    renderAllStatements(allBankNames); // यह एक हेल्पर फंक्शन होना चाहिए जो कैश और बैंक स्टेटमेंट को रेंडर करे
     updateTrendChart();
     updateBankPieChart();
 }
