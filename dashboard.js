@@ -265,8 +265,15 @@ buttons.addBank.addEventListener('click', async () => {
 
 // EXAMPLE MODIFICATION for renderTransactions
 function renderTransactions() {
+    // Filter out transactions that are from the 'add transaction' form only
+    // This ensures debtor and creditor transactions don't appear in the main transaction list
     tables.transactionsBody.innerHTML = transactions
         .slice()
+        .filter(tx => {
+            // Only include transactions that were explicitly added via the add transaction form
+            // Exclude transactions that were generated from debtor or creditor operations
+            return !tx.source || (tx.source !== 'debtor' && tx.source !== 'creditor');
+        })
         .sort((a, b) => new Date(b.date) - new Date(a.date)) // Newest first
         .map(tx => {
             // Format date as DD/MM/YYYY
@@ -339,13 +346,14 @@ forms.debtor.addEventListener("submit", async (e) => {
   try {
     await apiCall("debtors", "insert", { name, amount, date, mode, settled: false });
 
-    // Money given to debtor → minus entry
+    // Debtor Add → minus entry
     await apiCall("statements", "insert", {
       date,
       type: "Debtor",
       description: name,
       amount: -amount,
       mode,
+      source: "debtor" // Add source field to identify this as a debtor transaction
     });
 
     loadDebtors();
@@ -366,13 +374,14 @@ forms.debtorSettle.addEventListener("submit", async (e) => {
   try {
     await apiCall("debtors", "update", { id, settled: true });
 
-    // Money received back → plus entry
+    // Debtor Settle → plus entry (नई statement बनेगी)
     await apiCall("statements", "insert", {
       date,
       type: "Debtor Settlement",
       description: "Debtor settled",
       amount: +amount,
       mode,
+      source: "debtor" // Add source field to identify this as a debtor transaction
     });
 
     closeModal("debtor-settle-modal");
@@ -395,13 +404,14 @@ forms.creditor.addEventListener("submit", async (e) => {
   try {
     await apiCall("creditors", "insert", { name, amount, date, mode, settled: false });
 
-    // Loan received → plus entry
+    // Creditor Add → plus entry
     await apiCall("statements", "insert", {
       date,
       type: "Creditor",
       description: name,
       amount: +amount,
       mode,
+      source: "creditor" // Add source field to identify this as a creditor transaction
     });
 
     loadCreditors();
@@ -422,13 +432,14 @@ forms.settle.addEventListener("submit", async (e) => {
   try {
     await apiCall("creditors", "update", { id, settled: true });
 
-    // Loan repaid → minus entry (new statement)
+    // Creditor Settle → minus entry (नई statement बनेगी)
     await apiCall("statements", "insert", {
       date,
       type: "Creditor Settlement",
       description: "Creditor settled",
       amount: -amount,
       mode,
+      source: "creditor" // Add source field to identify this as a creditor transaction
     });
 
     closeModal("settle-modal");
@@ -2368,11 +2379,11 @@ forms.settle.addEventListener('submit', async function (e) {
         };
 
         if (settleType === 'debtor') {
-            // Debtor → paisa wapas mila (plus)
+            // Debtor Settle → plus entry (नई statement बनेगी)
             statementEntry.amount = +settleAmount;
             debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
         } else {
-            // Creditor → paisa wapas diya (minus)
+            // Creditor Settle → minus entry (नई statement बनेगी)
             statementEntry.amount = -settleAmount;
             creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
         }
