@@ -945,11 +945,11 @@ function renderCreditors() {
     const body = document.getElementById('creditorsBody');
     if (!body) return;
     const rowsHtml = (creditors || [])
-        .filter(c => c.amount >= 0) // <-- यह लाइन जोड़ें (सिर्फ पॉजिटिव अमाउंट दिखाएँ)
         .slice()
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
+        .reverse() // Newest first
         .map((c, index) => {
-            // ... बाकी का कोड जैसा था वैसा ही रहेगा ...
+            // Format date as DD/MM/YYYY
             let dateStr = '';
             if (c.date) {
                 const dt = new Date(c.date);
@@ -969,11 +969,14 @@ function renderCreditors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
-
+    // ADDED: Event listener for creditor settle buttons
     document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', async function () {
             const creditorId = this.getAttribute('data-id');
-            openSettleModal('creditor', creditorId);
+            const creditor = creditors.find(c => c.id === creditorId);
+            if (creditor) {
+                openSettleModal('creditor', creditorId);
+            }
         });
     });
 }
@@ -1961,29 +1964,28 @@ function makeStatements() {
         });
     });
 
-// 3. Creditors की गणना (नया और सरल तरीका)
+    // 3. Creditors (लोन लिया) की गणना - यह महत्वपूर्ण बदलाव है
     (creditors || []).forEach(cr => {
-        const amount = Number(cr.amount) || 0;
-        const paymentType = cr.payment_type;
+        const payment = (cr.split_payments && cr.split_payments[0]) || { amount: cr.amount, type: cr.payment_type };
+        const amount = Number(payment.amount) || 0;
+        const type = payment.type;
 
-        if (amount > 0) {
-            // अगर अमाउंट पॉजिटिव है, तो यह 'In' (पैसा आया) है
-            const description = cr.description ? `${cr.name} (${cr.description})` : `${cr.name} (Loan Taken)`;
-            const inEntry = { date: cr.date, description: description, in: amount, out: 0 };
-            
-            if (paymentType.toLowerCase() === 'cash') cashStatements.push(inEntry);
-            else {
-                if (!bankStatements[paymentType]) bankStatements[paymentType] = [];
-                bankStatements[paymentType].push(inEntry);
-            }
-        } else if (amount < 0) {
-            // अगर अमाउंट नेगेटिव है, तो यह 'Out' (पैसा गया) है
-            const outEntry = { date: cr.date, description: cr.description, in: 0, out: Math.abs(amount) }; // Math.abs() नेगेटिव साइन हटा देगा
+        // जब लोन लिया गया (पैसा आया - In)
+        const inEntry = { date: cr.date, description: `${cr.name} (Loan Taken)`, in: amount, out: 0 };
+        if (type.toLowerCase() === 'cash') cashStatements.push(inEntry);
+        else {
+            if (!bankStatements[type]) bankStatements[type] = [];
+            bankStatements[type].push(inEntry);
+        }
 
-            if (paymentType.toLowerCase() === 'cash') cashStatements.push(outEntry);
+        // जब लोन चुकाया गया (पैसा गया - Out)
+        if (cr.status === 'Settled') {
+            // हम मान रहे हैं कि सेटलमेंट उसी खाते से हुआ जिससे लिया गया था
+            const outEntry = { date: cr.date, description: `${cr.name} (Loan Settled)`, in: 0, out: amount };
+            if (type.toLowerCase() === 'cash') cashStatements.push(outEntry);
             else {
-                if (!bankStatements[paymentType]) bankStatements[paymentType] = [];
-                bankStatements[paymentType].push(outEntry);
+                if (!bankStatements[type]) bankStatements[type] = [];
+                bankStatements[type].push(outEntry);
             }
         }
     });
@@ -2000,57 +2002,7 @@ function makeStatements() {
     updateTrendChart();
     updateBankPieChart();
 }
-function renderAllStatements(allBankNames) {
-    // --- कैश स्टेटमेंट को रेंडर करें ---
-    cashStatements.sort((a, b) => new Date(a.date) - new Date(b.date));
-    let runningCash = 0;
-    const cashRows = cashStatements.map(entry => {
-        runningCash += (Number(entry.in) || 0) - (Number(entry.out) || 0);
-        const d = new Date(entry.date);
-        const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-        return `<tr>
-            <td>${dateStr}</td>
-            <td>${entry.description || ''}</td>
-            <td>₹${(Number(entry.in) || 0).toFixed(2)}</td>
-            <td>₹${(Number(entry.out) || 0).toFixed(2)}</td>
-            <td>₹${runningCash.toFixed(2)}</td>
-        </tr>`;
-    }).join('');
-    
-    if (tables.cashStatementBody) tables.cashStatementBody.innerHTML = cashRows;
-    if (stats.cash) stats.cash.textContent = runningCash.toFixed(2);
-    const cashBalanceElem = document.getElementById('cashBalanceCash');
-    if (cashBalanceElem) cashBalanceElem.textContent = runningCash.toFixed(2);
 
-    // --- बैंक बैलेंस की लिस्ट को रेंडर करें ---
-    const bankBalancesElem = document.getElementById('bankBalances');
-    let totalBankBalance = 0;
-    if (bankBalancesElem) {
-        const bankItems = Array.from(allBankNames).sort().map(bankName => {
-            const statements = bankStatements[bankName] || [];
-            const balance = statements.reduce((bal, entry) => bal + (Number(entry.in) || 0) - (Number(entry.out) || 0), 0);
-            totalBankBalance += balance;
-            return `<div class="bank-balance-item" data-bank="${bankName}" style="cursor:pointer; padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-                        <span>${bankName}</span>
-                        <span>₹${balance.toFixed(2)}</span>
-                    </div>`;
-        }).join('');
-        bankBalancesElem.innerHTML = bankItems || '<p>No bank accounts found.</p>';
-
-        // ▼▼▼ यह महत्वपूर्ण हिस्सा जोड़ा गया है ▼▼▼
-        // बैंक लिस्ट पर क्लिक इवेंट लिस्नर लगाएँ
-        bankBalancesElem.onclick = (e) => {
-            const item = e.target.closest('[data-bank]');
-            if (item) {
-                const bankName = item.getAttribute('data-bank');
-                renderBankStatement(bankName);
-            }
-        };
-        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-    }
-
-    if (stats.bank) stats.bank.textContent = totalBankBalance.toFixed(2);
-}
 
 function renderBankStatement(bankName) {
     const selectedNameElem = document.getElementById('selectedBankName');
@@ -2148,51 +2100,66 @@ async function openSettleModal(type, id) {
     showModal('settle');
 }
 
+// --- Settle Form Submit: Only update status and update statements (no new transaction) ---
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
-    const settleType = this.dataset.settleType; // We'll focus on 'creditor'
+    const settleType = this.dataset.settleType;
+    const originalItem = settleType === 'debtor' ? debtors.find(d => d.id === editingId) : creditors.find(c => c.id === editingId);
 
-    const originalItem = creditors.find(c => c.id == editingId);
     if (!originalItem) {
-        alert("Error: Original creditor not found!");
+        alert("Could not find the original item to settle.");
         return;
     }
 
-    // फॉर्म से सेटलमेंट की जानकारी लें
+    // Mark as Settled
+    const updatePayload = { ...originalItem, status: 'Settled' };
+
+    // Settlement details
     const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
-    const paymentType = document.getElementById('settlePaymentType').value;
+    const settlePaymentType = document.getElementById('settlePaymentType').value;
     const settleDate = document.getElementById('settleDate').value;
+    const settleDesc = document.getElementById('settleDescription').value || `Settlement for ${originalItem.name}`;
 
     try {
-        // 1. एक नई 'क्रेडिटर' एंट्री बनाएँ, लेकिन नेगेटिव अमाउंट के साथ
-        const settlementEntry = {
+        // Update creditor/debtor record
+        await apiCall((settleType === 'debtor' ? 'debtors' : 'creditors'), 'update', updatePayload);
+
+        // Statement entry
+        const statementEntry = {
             date: settleDate,
-            name: originalItem.name,
-            phone: originalItem.phone,
-            amount: -settleAmount, // अमाउंट को नेगेटिव कर दें
-            payment_type: paymentType,
-            description: `Settlement for ${originalItem.name}`,
-            status: 'Settled' // इस एंट्री का स्टेटस भी Settled रहेगा
+            type: settlePaymentType,
+            amount: 0,
+            payment_type: settlePaymentType,
+            description: settleDesc,
+            source: settleType // Add source field to identify this as a settlement transaction
         };
 
-        // इस नई नेगेटिव एंट्री को Supabase में सेव करें
-        const savedSettlement = await apiCall('creditors', 'insert', settlementEntry);
-        creditors.push(savedSettlement); // इसे लोकल लिस्ट में जोड़ें
+        if (settleType === 'debtor') {
+            // Debtor Settle → plus entry (नई statement बनेगी)
+            statementEntry.amount = +settleAmount;
+            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
+        } else {
+            // Creditor Settle → minus entry (नई statement बनेगी)
+            statementEntry.amount = -settleAmount;
+            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
+        }
 
-        // 2. पुरानी वाली (पॉजिटिव) एंट्री का स्टेटस 'Settled' में बदलें
-        const updatedOriginal = await apiCall('creditors', 'update', { id: editingId, status: 'Settled' });
-        creditors = creditors.map(c => c.id == editingId ? updatedOriginal : c);
+        // Save statement in Supabase
+        await apiCall('statements', 'insert', statementEntry);
 
-        // 3. UI रिफ्रेश करें
+        // Local update (for UI)
+        cashStatements.push(statementEntry);
         makeStatements();
-        renderCreditors();
-        modals.settle.style.display = 'none';
-        alert('Settlement recorded successfully!');
+
+        // Refresh UI
+        init();
+        if (modals.settle) modals.settle.style.display = 'none';
+        alert(`${settleType} settled successfully.`);
 
     } catch (error) {
-        console.error("Error processing settlement:", error);
-        alert('Failed to process settlement.');
+        console.error("Error settling:", error);
+        alert('Failed to settle. Please try again.');
     }
 });
 
