@@ -338,10 +338,10 @@ if (forms.expense) {
 // ADDED: forms.debtor.addEventListener with Supabase integration
 forms.debtor.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const name = document.getElementById("debtor-name").value;
-  const amount = parseFloat(document.getElementById("debtor-amount").value);
-  const mode = document.getElementById("debtor-mode").value;
-  const date = document.getElementById("debtor-date").value;
+  const name = document.getElementById("debtorName").value;
+  const amount = parseFloat(document.querySelector(".debtorAmount").value);
+  const mode = document.querySelector(".debtorPaymentType").value;
+  const date = document.getElementById("debtorDate").value;
 
   try {
     await apiCall("debtors", "insert", { name, amount, date, mode, settled: false });
@@ -370,10 +370,10 @@ forms.debtor.addEventListener("submit", async (e) => {
 
 forms.creditor.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const name = document.getElementById("creditor-name").value;
-  const amount = parseFloat(document.getElementById("creditor-amount").value);
-  const mode = document.getElementById("creditor-mode").value;
-  const date = document.getElementById("creditor-date").value;
+  const name = document.getElementById("creditorName").value;
+  const amount = parseFloat(document.querySelector(".creditorAmount").value);
+  const mode = document.querySelector(".creditorPaymentType").value;
+  const date = document.getElementById("creditorDate").value;
 
   try {
     await apiCall("creditors", "insert", { name, amount, date, mode, settled: false });
@@ -398,26 +398,44 @@ forms.creditor.addEventListener("submit", async (e) => {
 
 forms.settle.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const id = forms.settle.dataset.id;
-  const amount = parseFloat(document.getElementById("settle-amount").value);
-  const mode = document.getElementById("settle-mode").value;
-  const date = document.getElementById("settle-date").value;
+  const id = forms.settle.dataset.editingId;
+  const type = forms.settle.dataset.settleType;
+  const amount = parseFloat(document.getElementById("settleAmount").value);
+  const mode = document.getElementById("settlePaymentType").value;
+  const date = document.getElementById("settleDate").value;
 
   try {
-    await apiCall("creditors", "update", { id, settled: true });
+    if (type === 'creditor') {
+      await apiCall("creditors", "update", { id, settled: true });
 
-    // Creditor Settle → minus entry (नई statement बनेगी)
-    await apiCall("statements", "insert", {
-      date,
-      type: "Creditor Settlement",
-      description: "Creditor settled",
-      amount: -amount,
-      mode,
-      source: "creditor" // Add source field to identify this as a creditor transaction
-    });
+      // Creditor Settle → minus entry (नई statement बनेगी)
+      await apiCall("statements", "insert", {
+        date,
+        type: "Creditor Settlement",
+        description: "Creditor settled",
+        amount: -amount,
+        mode,
+        source: "creditor" // Add source field to identify this as a creditor transaction
+      });
+      
+      loadCreditors();
+    } else if (type === 'debtor') {
+      await apiCall("debtors", "update", { id, settled: true });
 
-    closeModal("settle-modal");
-    loadCreditors();
+      // Debtor Settle → plus entry (नई statement बनेगी)
+      await apiCall("statements", "insert", {
+        date,
+        type: "Debtor Settlement",
+        description: "Debtor settled",
+        amount: +amount,
+        mode,
+        source: "debtor" // Add source field to identify this as a debtor transaction
+      });
+      
+      loadDebtors();
+    }
+
+    showModal('none');
     makeStatements();
     updateBalances();
   } catch (err) {
