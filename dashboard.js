@@ -386,11 +386,12 @@ forms.creditor.addEventListener("submit", async (e) => {
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
-    const settleType = this.dataset.settleType;
+    const settleType = this.dataset.settleType; 
 
-    // जिस आइटम को सेटल कर रहे हैं, उसका पूरा पुराना डेटा खोजें
-    const originalItem = settleType === 'debtor'
-        ? debtors.find(d => d.id == editingId)
+    // This logic will now handle both debtors and creditors
+    const isDebtor = settleType === 'debtor';
+    const originalItem = isDebtor 
+        ? debtors.find(d => d.id == editingId) 
         : creditors.find(c => c.id == editingId);
 
     if (!originalItem) {
@@ -398,36 +399,50 @@ forms.settle.addEventListener('submit', async function (e) {
         return;
     }
 
+    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
+    const paymentType = document.getElementById('settlePaymentType').value;
+    const settleDate = document.getElementById('settleDate').value;
+
     try {
-        // अपडेट करने के लिए पेलोड बनाएँ
-        // इसमें पुराने आइटम का सारा डेटा (...originalItem) होगा और सिर्फ स्टेटस बदलेगा
-        const updatePayload = {
-            ...originalItem,
+        // 1. Create a new entry for the settlement with a negative amount
+        const settlementEntry = {
+            date: settleDate,
+            name: originalItem.name,
+            phone: originalItem.phone,
+            amount: -settleAmount, // The amount is negative
+            payment_type: paymentType,
+            description: `Settlement for ${originalItem.name}`,
             status: 'Settled'
         };
 
-        const table = settleType === 'debtor' ? 'debtors' : 'creditors';
+        const table = isDebtor ? 'debtors' : 'creditors';
+        const savedSettlement = await apiCall(table, 'insert', settlementEntry);
         
-        // डेटाबेस में अपडेट करें
-        const updatedItem = await apiCall(table, 'update', updatePayload);
-
-        // लोकल डेटा को नए, अपडेटेड आइटम से बदलें
-        if (settleType === 'debtor') {
-            debtors = debtors.map(d => d.id == editingId ? updatedItem : d);
+        if (isDebtor) {
+            debtors.push(savedSettlement);
         } else {
-            creditors = creditors.map(c => c.id == editingId ? updatedItem : c);
+            creditors.push(savedSettlement);
         }
 
-        // UI को रिफ्रेश करें
+        // 2. Update the status of the original (positive) entry
+        const updatedOriginal = await apiCall(table, 'update', { id: editingId, status: 'Settled' });
+        
+        if (isDebtor) {
+            debtors = debtors.map(d => d.id == editingId ? updatedOriginal : d);
+        } else {
+            creditors = creditors.map(c => c.id == editingId ? updatedOriginal : c);
+        }
+
+        // 3. Refresh the UI
         makeStatements();
         renderDebtors();
         renderCreditors();
         modals.settle.style.display = 'none';
-        alert(`${settleType.charAt(0).toUpperCase() + settleType.slice(1)} settled successfully.`);
+        alert('Settlement recorded successfully!');
 
     } catch (error) {
-        console.error("Error settling:", error);
-        alert('Failed to settle. Please try again.');
+        console.error("Error processing settlement:", error);
+        alert('Failed to process settlement.');
     }
 });
 
@@ -942,16 +957,11 @@ function renderCreditors() {
     const body = document.getElementById('creditorsBody');
     if (!body) return;
     const rowsHtml = (creditors || [])
+        .filter(c => c.amount >= 0) // Only show positive amounts (original loans)
         .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
-        .reverse() // Newest first
-        .map((c, index) => {
-            // Format date as DD/MM/YYYY
-            let dateStr = '';
-            if (c.date) {
-                const dt = new Date(c.date);
-                dateStr = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
-            }
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map((c) => {
+            let dateStr = c.date ? new Date(c.date).toLocaleDateString('en-GB') : '';
             const amount = Number(c.amount) || 0;
             return `
                 <tr>
@@ -966,14 +976,11 @@ function renderCreditors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
-    // ADDED: Event listener for creditor settle buttons
+
     document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
+        btn.addEventListener('click', function () {
             const creditorId = this.getAttribute('data-id');
-            const creditor = creditors.find(c => c.id === creditorId);
-            if (creditor) {
-                openSettleModal('creditor', creditorId);
-            }
+            openSettleModal('creditor', creditorId);
         });
     });
 }
@@ -1916,15 +1923,19 @@ async function settleItem(type, id) {
 }
 
 function makeStatements() {
+    // ... function starts the same way with totalIncome, totalExpenses etc. ...
     let totalIncome = 0;
     let totalExpenses = 0;
     cashStatements = [];
     bankStatements = {};
 
-    const allBankNames = new Set(banks.filter(b => b && b.toLowerCase() !== 'cash'));
+    const allBankNames = new Set(banks.filter(b => b && b.toLowerCase() !== 'cash' && b !== 'Bank (Generic)'));
     allBankNames.forEach(bankName => { bankStatements[bankName] = []; });
 
-    // 1. Transactions से Income की गणना
+    // Handles Transactions, Expenses...
+    // (The code for Transactions and Expenses remains the same)
+
+    // ... The existing code for transactions ...
     (transactions || []).forEach(tx => {
         const inTotal = (tx.in_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
         const outTotal = (tx.out_payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
@@ -1947,9 +1958,8 @@ function makeStatements() {
             }
         });
     });
-
-    // 2. Expenses से खर्चों की गणना
-    (expenses || []).forEach(ex => {
+    // ... The existing code for expenses ...
+     (expenses || []).forEach(ex => {
         totalExpenses += Number(ex.amount) || 0;
         (ex.split_payments || [{ amount: ex.amount, type: ex.payment_type }]).forEach(p => {
             const entry = { date: ex.date, description: ex.item || ex.category, in: 0, out: Number(p.amount) };
@@ -1961,47 +1971,43 @@ function makeStatements() {
         });
     });
 
-    // 3. Creditors (लोन लिया) की गणना - यह महत्वपूर्ण बदलाव है
+
+    // 3. Creditors Logic (Corrected)
     (creditors || []).forEach(cr => {
-        const payment = (cr.split_payments && cr.split_payments[0]) || { amount: cr.amount, type: cr.payment_type };
-        const amount = Number(payment.amount) || 0;
-        const type = payment.type;
+        const amount = Number(cr.amount) || 0;
+        const paymentType = cr.payment_type || 'Cash';
 
-        // जब लोन लिया गया (पैसा आया - In)
-        const inEntry = { date: cr.date, description: `${cr.name} (Loan Taken)`, in: amount, out: 0 };
-        if (type.toLowerCase() === 'cash') cashStatements.push(inEntry);
-        else {
-            if (!bankStatements[type]) bankStatements[type] = [];
-            bankStatements[type].push(inEntry);
-        }
+        if (amount > 0) {
+            // Positive amount is a loan taken (money IN)
+            const description = cr.description ? `${cr.name} (${cr.description})` : `${cr.name} (Loan Taken)`;
+            const inEntry = { date: cr.date, description: description, in: amount, out: 0 };
+            
+            if (paymentType.toLowerCase() === 'cash') {
+                cashStatements.push(inEntry);
+            } else if (bankStatements[paymentType]) {
+                bankStatements[paymentType].push(inEntry);
+            }
+        } else if (amount < 0) {
+            // Negative amount is a settlement (money OUT), using its own date
+            const outEntry = { date: cr.date, description: cr.description, in: 0, out: Math.abs(amount) };
 
-        // जब लोन चुकाया गया (पैसा गया - Out)
-        if (cr.status === 'Settled') {
-            // हम मान रहे हैं कि सेटलमेंट उसी खाते से हुआ जिससे लिया गया था
-            const outEntry = { date: cr.settleDate, description: `${cr.name} (Loan Settled)`, in: 0, out: amount };
-            if (type.toLowerCase() === 'cash') cashStatements.push(outEntry);
-            else {
-                if (!bankStatements[type]) bankStatements[type] = [];
-                bankStatements[type].push(outEntry);
+            if (paymentType.toLowerCase() === 'cash') {
+                cashStatements.push(outEntry);
+            } else if (bankStatements[paymentType]) {
+                bankStatements[paymentType].push(outEntry);
             }
         }
     });
 
-    // 4. Debtors (लोन दिया) की गणना
+    // 4. Debtors Logic (Corrected)
     (debtors || []).forEach(db => {
         const amount = Number(db.amount) || 0;
-        // Default to 'Cash' if payment_type is missing, for safety.
         const paymentType = db.payment_type || 'Cash';
 
         if (amount > 0) {
-            // A positive amount means a loan was given (money went 'Out').
+            // Positive amount is a loan given (money OUT)
             const description = db.description ? `${db.name} (${db.description})` : `${db.name} (Loan Given)`;
-            const outEntry = {
-                date: db.date,
-                description: description,
-                in: 0,
-                out: amount
-            };
+            const outEntry = { date: db.date, description: description, in: 0, out: amount };
             
             if (paymentType.toLowerCase() === 'cash') {
                 cashStatements.push(outEntry);
@@ -2009,14 +2015,9 @@ function makeStatements() {
                 bankStatements[paymentType].push(outEntry);
             }
         } else if (amount < 0) {
-            // A negative amount means a loan was repaid (money came 'In').
-            const inEntry = { 
-                date: db.date, 
-                description: db.description || `Repayment from ${db.name}`, 
-                in: Math.abs(amount), 
-                out: 0 
-            };
-
+            // Negative amount is a repayment (money IN), using its own date
+            const inEntry = { date: db.date, description: db.description || `Repayment from ${db.name}`, in: Math.abs(amount), out: 0 };
+            
             if (paymentType.toLowerCase() === 'cash') {
                 cashStatements.push(inEntry);
             } else if (bankStatements[paymentType]) {
@@ -2024,22 +2025,14 @@ function makeStatements() {
             }
         }
     });
-    
-    // 4. Transfers की गणना (यह नया सेक्शन है)
-    (transfers || []).forEach(tr => {
+
+    // ... (The code for Transfers and UI updates remains the same) ...
+     (transfers || []).forEach(tr => {
         const amount = Number(tr.amount) || 0;
         if (amount <= 0) return; // Ignore transfers with no amount
 
-        // --- पैसे जाने की एंट्री (Out Entry) ---
         const fromAccount = tr.from;
-        const outEntry = {
-            date: tr.date,
-            description: `Transfer to ${tr.to}`,
-            in: 0,
-            out: amount
-        };
-
-        // Check if the money went from Cash or a Bank
+        const outEntry = { date: tr.date, description: `Transfer to ${tr.to}`, in: 0, out: amount };
         if (fromAccount) {
             if (fromAccount.toLowerCase() === 'cash') {
                 cashStatements.push(outEntry);
@@ -2048,16 +2041,8 @@ function makeStatements() {
             }
         }
 
-        // --- पैसे आने की एंट्री (In Entry) ---
         const toAccount = tr.to;
-        const inEntry = {
-            date: tr.date,
-            description: `Transfer from ${tr.from}`,
-            in: amount,
-            out: 0
-        };
-
-        // Check if the money came into Cash or a Bank
+        const inEntry = { date: tr.date, description: `Transfer from ${tr.from}`, in: amount, out: 0 };
         if (toAccount) {
             if (toAccount.toLowerCase() === 'cash') {
                 cashStatements.push(inEntry);
@@ -2067,12 +2052,13 @@ function makeStatements() {
         }
     });
 
-    // UI अपडेट करें
+
+    // Update UI
     stats.income.textContent = totalIncome.toFixed(2);
     stats.expenses.textContent = totalExpenses.toFixed(2);
     stats.profit.textContent = (totalIncome - totalExpenses).toFixed(2);
 
-    renderAllStatements(allBankNames); // यह एक हेल्पर फंक्शन होना चाहिए जो कैश और बैंक स्टेटमेंट को रेंडर करे
+    renderAllStatements(allBankNames);
     updateTrendChart();
     updateBankPieChart();
 }
