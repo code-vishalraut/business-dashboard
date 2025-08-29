@@ -2030,7 +2030,6 @@ function renderAllStatements(allBankNames) {
     if (bankBalancesElem) {
         const bankItems = Array.from(allBankNames).sort().map(bankName => {
             const statements = bankStatements[bankName] || [];
-            // बैंक का बैलेंस उसके स्टेटमेंट से कैलकुलेट करें
             const balance = statements.reduce((bal, entry) => bal + (Number(entry.in) || 0) - (Number(entry.out) || 0), 0);
             totalBankBalance += balance;
             return `<div class="bank-balance-item" data-bank="${bankName}" style="cursor:pointer; padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
@@ -2039,6 +2038,17 @@ function renderAllStatements(allBankNames) {
                     </div>`;
         }).join('');
         bankBalancesElem.innerHTML = bankItems || '<p>No bank accounts found.</p>';
+
+        // ▼▼▼ यह महत्वपूर्ण हिस्सा जोड़ा गया है ▼▼▼
+        // बैंक लिस्ट पर क्लिक इवेंट लिस्नर लगाएँ
+        bankBalancesElem.onclick = (e) => {
+            const item = e.target.closest('[data-bank]');
+            if (item) {
+                const bankName = item.getAttribute('data-bank');
+                renderBankStatement(bankName);
+            }
+        };
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     }
 
     if (stats.bank) stats.bank.textContent = totalBankBalance.toFixed(2);
