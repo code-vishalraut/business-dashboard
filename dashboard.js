@@ -344,7 +344,7 @@ forms.debtor.addEventListener("submit", async (e) => {
   const date = document.getElementById("debtorDate").value;
 
   try {
-    await apiCall("debtors", "insert", { name, amount, date, mode, settled: false });
+    await apiCall("debtors", "insert", { name, amount, date, payment_type: mode, settled: false });
 
     // Debtor Add → minus entry
     await apiCall("statements", "insert", {
@@ -352,7 +352,7 @@ forms.debtor.addEventListener("submit", async (e) => {
       type: "Debtor",
       description: name,
       amount: -amount,
-      mode,
+      payment_type: mode,
       source: "debtor" // Add source field to identify this as a debtor transaction
     });
 
@@ -376,7 +376,7 @@ forms.creditor.addEventListener("submit", async (e) => {
   const date = document.getElementById("creditorDate").value;
 
   try {
-    await apiCall("creditors", "insert", { name, amount, date, mode, settled: false });
+    await apiCall("creditors", "insert", { name, amount, date, payment_type: mode, settled: false });
 
     // Creditor Add → plus entry
     await apiCall("statements", "insert", {
@@ -384,7 +384,7 @@ forms.creditor.addEventListener("submit", async (e) => {
       type: "Creditor",
       description: name,
       amount: +amount,
-      mode,
+      payment_type: mode,
       source: "creditor" // Add source field to identify this as a creditor transaction
     });
 
@@ -414,7 +414,7 @@ forms.settle.addEventListener("submit", async (e) => {
         type: "Creditor Settlement",
         description: "Creditor settled",
         amount: -amount,
-        mode,
+        payment_type: mode,
         source: "creditor" // Add source field to identify this as a creditor transaction
       });
       
@@ -428,7 +428,7 @@ forms.settle.addEventListener("submit", async (e) => {
         type: "Debtor Settlement",
         description: "Debtor settled",
         amount: +amount,
-        mode,
+        payment_type: mode,
         source: "debtor" // Add source field to identify this as a debtor transaction
       });
       
@@ -2367,7 +2367,9 @@ forms.settle.addEventListener('submit', async function (e) {
             date: settleDate,
             type: settlePaymentType,
             amount: 0,
-            description: settleDesc
+            payment_type: settlePaymentType,
+            description: settleDesc,
+            source: settleType // Add source field to identify this as a settlement transaction
         };
 
         if (settleType === 'debtor') {
