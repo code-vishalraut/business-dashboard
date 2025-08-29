@@ -427,7 +427,7 @@ forms.settle.addEventListener('submit', async function (e) {
 
     } catch (error) {
         console.error("Error settling:", error);
-        alert('Failed to settle. Please check the console for details.');
+        alert('Failed to settle. Please try again.');
     }
 });
 
@@ -905,11 +905,11 @@ function renderDebtors() {
     const body = document.getElementById('debtorsBody');
     if (!body) return;
     const rowsHtml = (debtors || [])
+        .filter(d => d.amount >= 0) // <-- Add this line
         .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
-        .reverse() // Newest first
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
         .map((d, index) => {
-            // Format date as DD/MM/YYYY
+            // ... the rest of the function remains the same ...
             let dateStr = '';
             if (d.date) {
                 const dt = new Date(d.date);
@@ -929,14 +929,11 @@ function renderDebtors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
-    // ADDED: Event listener for debtor settle buttons
+
     document.querySelectorAll('#debtorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
+        btn.addEventListener('click', function () {
             const debtorId = this.getAttribute('data-id');
-            const debtor = debtors.find(d => d.id === debtorId);
-            if (debtor) {
-                openSettleModal('debtor', debtorId); // Pass type and ID
-            }
+            openSettleModal('debtor', debtorId);
         });
     });
 }
@@ -1913,8 +1910,8 @@ async function settleItem(type, id) {
         makeStatements();
         alert(`${type.charAt(0).toUpperCase() + type.slice(1)} settled successfully.`);
     } catch (error) {
-        console.error("Error settling debt:", error);
-        alert('Failed to settle debt.');
+        console.error("Error settling:", error);
+        alert('Failed to settle. Please try again.');
     }
 }
 
@@ -1981,7 +1978,7 @@ function makeStatements() {
         // जब लोन चुकाया गया (पैसा गया - Out)
         if (cr.status === 'Settled') {
             // हम मान रहे हैं कि सेटलमेंट उसी खाते से हुआ जिससे लिया गया था
-            const outEntry = { date: cr.date, description: `${cr.name} (Loan Settled)`, in: 0, out: amount };
+            const outEntry = { date: cr.settleDate, description: `${cr.name} (Loan Settled)`, in: 0, out: amount };
             if (type.toLowerCase() === 'cash') cashStatements.push(outEntry);
             else {
                 if (!bankStatements[type]) bankStatements[type] = [];
@@ -1991,7 +1988,84 @@ function makeStatements() {
     });
 
     // 4. Debtors (लोन दिया) की गणना
-    // (Debtors के लिए भी इसी तरह की लॉजिक यहाँ जोड़ी जा सकती है)
+    (debtors || []).forEach(db => {
+        const amount = Number(db.amount) || 0;
+        // Default to 'Cash' if payment_type is missing, for safety.
+        const paymentType = db.payment_type || 'Cash';
+
+        if (amount > 0) {
+            // A positive amount means a loan was given (money went 'Out').
+            const description = db.description ? `${db.name} (${db.description})` : `${db.name} (Loan Given)`;
+            const outEntry = {
+                date: db.date,
+                description: description,
+                in: 0,
+                out: amount
+            };
+            
+            if (paymentType.toLowerCase() === 'cash') {
+                cashStatements.push(outEntry);
+            } else if (bankStatements[paymentType]) {
+                bankStatements[paymentType].push(outEntry);
+            }
+        } else if (amount < 0) {
+            // A negative amount means a loan was repaid (money came 'In').
+            const inEntry = { 
+                date: db.date, 
+                description: db.description || `Repayment from ${db.name}`, 
+                in: Math.abs(amount), 
+                out: 0 
+            };
+
+            if (paymentType.toLowerCase() === 'cash') {
+                cashStatements.push(inEntry);
+            } else if (bankStatements[paymentType]) {
+                bankStatements[paymentType].push(inEntry);
+            }
+        }
+    });
+    
+    // 4. Transfers की गणना (यह नया सेक्शन है)
+    (transfers || []).forEach(tr => {
+        const amount = Number(tr.amount) || 0;
+        if (amount <= 0) return; // Ignore transfers with no amount
+
+        // --- पैसे जाने की एंट्री (Out Entry) ---
+        const fromAccount = tr.from;
+        const outEntry = {
+            date: tr.date,
+            description: `Transfer to ${tr.to}`,
+            in: 0,
+            out: amount
+        };
+
+        // Check if the money went from Cash or a Bank
+        if (fromAccount) {
+            if (fromAccount.toLowerCase() === 'cash') {
+                cashStatements.push(outEntry);
+            } else if (bankStatements[fromAccount]) {
+                bankStatements[fromAccount].push(outEntry);
+            }
+        }
+
+        // --- पैसे आने की एंट्री (In Entry) ---
+        const toAccount = tr.to;
+        const inEntry = {
+            date: tr.date,
+            description: `Transfer from ${tr.from}`,
+            in: amount,
+            out: 0
+        };
+
+        // Check if the money came into Cash or a Bank
+        if (toAccount) {
+            if (toAccount.toLowerCase() === 'cash') {
+                cashStatements.push(inEntry);
+            } else if (bankStatements[toAccount]) {
+                bankStatements[toAccount].push(inEntry);
+            }
+        }
+    });
 
     // UI अपडेट करें
     stats.income.textContent = totalIncome.toFixed(2);
