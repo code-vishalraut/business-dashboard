@@ -945,11 +945,11 @@ function renderCreditors() {
     const body = document.getElementById('creditorsBody');
     if (!body) return;
     const rowsHtml = (creditors || [])
+        .filter(c => c.amount >= 0) // <-- यह लाइन जोड़ें (सिर्फ पॉजिटिव अमाउंट दिखाएँ)
         .slice()
-        .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.createdAt || 0))
-        .reverse() // Newest first
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
         .map((c, index) => {
-            // Format date as DD/MM/YYYY
+            // ... बाकी का कोड जैसा था वैसा ही रहेगा ...
             let dateStr = '';
             if (c.date) {
                 const dt = new Date(c.date);
@@ -969,14 +969,11 @@ function renderCreditors() {
                 </tr>`;
         }).join('');
     body.innerHTML = rowsHtml;
-    // ADDED: Event listener for creditor settle buttons
+
     document.querySelectorAll('#creditorsBody .settle-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
+        btn.addEventListener('click', function () {
             const creditorId = this.getAttribute('data-id');
-            const creditor = creditors.find(c => c.id === creditorId);
-            if (creditor) {
-                openSettleModal('creditor', creditorId);
-            }
+            openSettleModal('creditor', creditorId);
         });
     });
 }
@@ -1964,28 +1961,29 @@ function makeStatements() {
         });
     });
 
-    // 3. Creditors (लोन लिया) की गणना - यह महत्वपूर्ण बदलाव है
+// 3. Creditors की गणना (नया और सरल तरीका)
     (creditors || []).forEach(cr => {
-        const payment = (cr.split_payments && cr.split_payments[0]) || { amount: cr.amount, type: cr.payment_type };
-        const amount = Number(payment.amount) || 0;
-        const type = payment.type;
+        const amount = Number(cr.amount) || 0;
+        const paymentType = cr.payment_type;
 
-        // जब लोन लिया गया (पैसा आया - In)
-        const inEntry = { date: cr.date, description: `${cr.name} (Loan Taken)`, in: amount, out: 0 };
-        if (type.toLowerCase() === 'cash') cashStatements.push(inEntry);
-        else {
-            if (!bankStatements[type]) bankStatements[type] = [];
-            bankStatements[type].push(inEntry);
-        }
-
-        // जब लोन चुकाया गया (पैसा गया - Out)
-        if (cr.status === 'Settled') {
-            // हम मान रहे हैं कि सेटलमेंट उसी खाते से हुआ जिससे लिया गया था
-            const outEntry = { date: cr.updated_at, description: `${cr.name} (Loan Settled)`, in: 0, out: amount };
-            if (type.toLowerCase() === 'cash') cashStatements.push(outEntry);
+        if (amount > 0) {
+            // अगर अमाउंट पॉजिटिव है, तो यह 'In' (पैसा आया) है
+            const description = cr.description ? `${cr.name} (${cr.description})` : `${cr.name} (Loan Taken)`;
+            const inEntry = { date: cr.date, description: description, in: amount, out: 0 };
+            
+            if (paymentType.toLowerCase() === 'cash') cashStatements.push(inEntry);
             else {
-                if (!bankStatements[type]) bankStatements[type] = [];
-                bankStatements[type].push(outEntry);
+                if (!bankStatements[paymentType]) bankStatements[paymentType] = [];
+                bankStatements[paymentType].push(inEntry);
+            }
+        } else if (amount < 0) {
+            // अगर अमाउंट नेगेटिव है, तो यह 'Out' (पैसा गया) है
+            const outEntry = { date: cr.date, description: cr.description, in: 0, out: Math.abs(amount) }; // Math.abs() नेगेटिव साइन हटा देगा
+
+            if (paymentType.toLowerCase() === 'cash') cashStatements.push(outEntry);
+            else {
+                if (!bankStatements[paymentType]) bankStatements[paymentType] = [];
+                bankStatements[paymentType].push(outEntry);
             }
         }
     });
@@ -2150,66 +2148,51 @@ async function openSettleModal(type, id) {
     showModal('settle');
 }
 
-// --- Settle Form Submit: Only update status and update statements (no new transaction) ---
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
-    const settleType = this.dataset.settleType;
-    const originalItem = settleType === 'debtor' ? debtors.find(d => d.id === editingId) : creditors.find(c => c.id === editingId);
+    const settleType = this.dataset.settleType; // We'll focus on 'creditor'
 
+    const originalItem = creditors.find(c => c.id == editingId);
     if (!originalItem) {
-        alert("Could not find the original item to settle.");
+        alert("Error: Original creditor not found!");
         return;
     }
 
-    // Mark as Settled
-    const updatePayload = { ...originalItem, status: 'Settled' };
-
-    // Settlement details
+    // फॉर्म से सेटलमेंट की जानकारी लें
     const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
-    const settlePaymentType = document.getElementById('settlePaymentType').value;
+    const paymentType = document.getElementById('settlePaymentType').value;
     const settleDate = document.getElementById('settleDate').value;
-    const settleDesc = document.getElementById('settleDescription').value || `Settlement for ${originalItem.name}`;
 
     try {
-        // Update creditor/debtor record
-        await apiCall((settleType === 'debtor' ? 'debtors' : 'creditors'), 'update', updatePayload);
-
-        // Statement entry
-        const statementEntry = {
+        // 1. एक नई 'क्रेडिटर' एंट्री बनाएँ, लेकिन नेगेटिव अमाउंट के साथ
+        const settlementEntry = {
             date: settleDate,
-            type: settlePaymentType,
-            amount: 0,
-            payment_type: settlePaymentType,
-            description: settleDesc,
-            source: settleType // Add source field to identify this as a settlement transaction
+            name: originalItem.name,
+            phone: originalItem.phone,
+            amount: -settleAmount, // अमाउंट को नेगेटिव कर दें
+            payment_type: paymentType,
+            description: `Settlement for ${originalItem.name}`,
+            status: 'Settled' // इस एंट्री का स्टेटस भी Settled रहेगा
         };
 
-        if (settleType === 'debtor') {
-            // Debtor Settle → plus entry (नई statement बनेगी)
-            statementEntry.amount = +settleAmount;
-            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
-        } else {
-            // Creditor Settle → minus entry (नई statement बनेगी)
-            statementEntry.amount = -settleAmount;
-            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
-        }
+        // इस नई नेगेटिव एंट्री को Supabase में सेव करें
+        const savedSettlement = await apiCall('creditors', 'insert', settlementEntry);
+        creditors.push(savedSettlement); // इसे लोकल लिस्ट में जोड़ें
 
-        // Save statement in Supabase
-        await apiCall('statements', 'insert', statementEntry);
+        // 2. पुरानी वाली (पॉजिटिव) एंट्री का स्टेटस 'Settled' में बदलें
+        const updatedOriginal = await apiCall('creditors', 'update', { id: editingId, status: 'Settled' });
+        creditors = creditors.map(c => c.id == editingId ? updatedOriginal : c);
 
-        // Local update (for UI)
-        cashStatements.push(statementEntry);
+        // 3. UI रिफ्रेश करें
         makeStatements();
-
-        // Refresh UI
-        init();
-        if (modals.settle) modals.settle.style.display = 'none';
-        alert(`${settleType} settled successfully.`);
+        renderCreditors();
+        modals.settle.style.display = 'none';
+        alert('Settlement recorded successfully!');
 
     } catch (error) {
-        console.error("Error settling:", error);
-        alert('Failed to settle. Please try again.');
+        console.error("Error processing settlement:", error);
+        alert('Failed to process settlement.');
     }
 });
 
