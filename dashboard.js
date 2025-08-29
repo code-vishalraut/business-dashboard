@@ -335,7 +335,6 @@ if (forms.expense) {
     });
 }
 
-// ADDED: forms.debtor.addEventListener with Supabase integration
 forms.debtor.addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = document.getElementById("debtorName").value;
@@ -344,22 +343,15 @@ forms.debtor.addEventListener("submit", async (e) => {
   const date = document.getElementById("debtorDate").value;
 
   try {
-    // Also add status: 'Pending' here for consistency
-    await apiCall("debtors", "insert", { name, amount, date, payment_type: mode, status: 'Pending' });
+    // सिर्फ डेटर टेबल में सेव करें
+    const newDebtor = await apiCall("debtors", "insert", { name, amount, date, payment_type: mode, status: 'Pending' });
     
-    // Debtor Add → minus entry
-    await apiCall("statements", "insert", {
-      date,
-      type: "Debtor",
-      description: name,
-      amount: -amount,
-      payment_type: mode,
-      source: "debtor" // Add source field to identify this as a debtor transaction
-    });
+    // लोकल डेटा अपडेट करें और स्टेटमेंट दोबारा बनाएँ
+    debtors.unshift(newDebtor); // लोकल डेटा में जोड़ें
+    makeStatements(); // यह फंक्शन सही स्टेटमेंट बना देगा
+    renderDebtors(); // टेबल को रिफ्रेश करें
+    modals.debtor.style.display = 'none'; // मोडल बंद करें
 
-    loadDebtors();
-    makeStatements();
-    updateBalances();
   } catch (err) {
     console.error("Error adding debtor:", err);
   }
@@ -377,71 +369,51 @@ forms.creditor.addEventListener("submit", async (e) => {
   const date = document.getElementById("creditorDate").value;
 
   try {
-    await apiCall("creditors", "insert", { name, amount, date, payment_type: mode, status: 'Pending' });
+    // सिर्फ क्रेडिटर टेबल में सेव करें
+    const newCreditor = await apiCall("creditors", "insert", { name, amount, date, payment_type: mode, status: 'Pending' });
 
-    // Creditor Add → plus entry
-    await apiCall("statements", "insert", {
-      date,
-      type: "Creditor",
-      description: name,
-      amount: +amount,
-      payment_type: mode,
-      source: "creditor" // Add source field to identify this as a creditor transaction
-    });
-
-    loadCreditors();
-    makeStatements();
-    updateBalances();
+    // लोकल डेटा अपडेट करें और स्टेटमेंट दोबारा बनाएँ
+    creditors.unshift(newCreditor); // लोकल डेटा में जोड़ें
+    makeStatements(); // यह फंक्शन सही स्टेटमेंट बना देगा
+    renderCreditors(); // टेबल को रिफ्रेश करें
+    modals.creditor.style.display = 'none'; // मोडल बंद करें
+    
   } catch (err) {
     console.error("Error adding creditor:", err);
   }
 });
 
-forms.settle.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const id = forms.settle.dataset.editingId;
-  const type = forms.settle.dataset.settleType;
-  const amount = parseFloat(document.getElementById("settleAmount").value);
-  const mode = document.getElementById("settlePaymentType").value;
-  const date = document.getElementById("settleDate").value;
+forms.settle.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const editingId = this.dataset.editingId;
+    const settleType = this.dataset.settleType;
+    
+    const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
+    // ... (अन्य डेटा फॉर्म से लें) ...
 
-  try {
-    if (type === 'creditor') {
-      await apiCall("creditors", "update", { id, settled: true });
+    try {
+        const payload = { id: editingId, status: 'Settled' }; // सिर्फ स्टेटस अपडेट करें
+        const table = settleType === 'debtor' ? 'debtors' : 'creditors';
+        
+        const updatedItem = await apiCall(table, 'update', { id: editingId, status: 'Settled' });
 
-      // Creditor Settle → minus entry (नई statement बनेगी)
-      await apiCall("statements", "insert", {
-        date,
-        type: "Creditor Settlement",
-        description: "Creditor settled",
-        amount: -amount,
-        payment_type: mode,
-        source: "creditor" // Add source field to identify this as a creditor transaction
-      });
-      
-      loadCreditors();
-    } else if (type === 'debtor') {
-      await apiCall("debtors", "update", { id, settled: true });
+        // लोकल डेटा को अपडेट करें
+        if (settleType === 'debtor') {
+            debtors = debtors.map(d => d.id === editingId ? updatedItem : d);
+        } else {
+            creditors = creditors.map(c => c.id === editingId ? updatedItem : c);
+        }
 
-      // Debtor Settle → plus entry (नई statement बनेगी)
-      await apiCall("statements", "insert", {
-        date,
-        type: "Debtor Settlement",
-        description: "Debtor settled",
-        amount: +amount,
-        payment_type: mode,
-        source: "debtor" // Add source field to identify this as a debtor transaction
-      });
-      
-      loadDebtors();
+        makeStatements(); // स्टेटमेंट दोबारा बनाएँ
+        renderDebtors();
+        renderCreditors();
+        modals.settle.style.display = 'none';
+        alert(`${settleType} settled successfully.`);
+
+    } catch (error) {
+        console.error("Error settling:", error);
+        alert('Failed to settle. Please try again.');
     }
-
-    showModal('none');
-    makeStatements();
-    updateBalances();
-  } catch (err) {
-    console.error("Error settling creditor:", err);
-  }
 });
 
 
