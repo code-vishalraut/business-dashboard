@@ -74,7 +74,7 @@ async function initializeDashboard(user) {
     if (authContainer) authContainer.style.display = 'none';
     if (dashboardWrapper) dashboardWrapper.style.display = 'block';
     try {
-        const allData = await apiCall('fetchAll');
+        const allData = await apiCall(null, 'fetchAll', null);
         transactions = allData.transactions || [];
         expenses = allData.expenses || [];
         debtors = allData.debtors || [];
@@ -97,13 +97,13 @@ async function initializeDashboard(user) {
 }
 
 // --- API Helper ---
-async function apiCall(action, payload) {
+async function apiCall(table, action, payload) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("No active session.");
     const response = await fetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ action, payload })
+        body: JSON.stringify({ table, action, payload })
     });
     if (!response.ok) {
         const errorData = await response.json();
@@ -238,7 +238,7 @@ function setupRemoveSplitButtons() { /* Your original function here */ }
 async function renderBanksList() {
     const bankListElem = document.getElementById('banksList');
     if (!bankListElem) return;
-    const currentBanks = (await apiCall('fetchAll')).banks.map(b => b.name);
+    const currentBanks = (await apiCall(null, 'fetchAll', null)).banks.map(b => b.name);
     bankListElem.innerHTML = currentBanks.filter(b => b !== 'Cash').map(b => `<div>${b}</div>`).join('');
 }
 
@@ -250,7 +250,7 @@ buttons.addBank.addEventListener('click', async () => {
     const bankName = document.getElementById('newBankName').value.trim();
     if (!bankName) return;
     if (!banks.includes(bankName)) {
-        await apiCall('addOrUpdate', { table: 'banks', data: { name: bankName } });
+        await apiCall('banks', 'insert', { name: bankName });
         banks.push(bankName);
         updatePaymentTypeOptions();
         renderBanksList();
@@ -325,7 +325,7 @@ if (forms.expense) {
             split_payments: split
         };
         // ADDED: Use apiCall to save expense to Supabase
-        await apiCall('addOrUpdate', { table: 'expenses', data: ex });
+        await apiCall('expenses', 'insert', ex);
         // Optimistically update UI or wait for real-time update
         expenses.unshift(ex);
         renderExpenses();
@@ -455,7 +455,7 @@ if (forms.transfer) {
             description: document.getElementById('transferDesc').value
         };
         try {
-            const savedTransfer = await apiCall('addOrUpdate', { table: 'transfers', data: t });
+            const savedTransfer = await apiCall('transfers', 'insert', t);
             transfers.unshift(savedTransfer);
             makeStatements();
             this.reset();
@@ -582,7 +582,7 @@ function setupProfileEventListeners() {
             };
 
             try {
-                await apiCall('addOrUpdate', { table: 'profile', data: updatedProfile });
+                await apiCall('profile', 'insert', updatedProfile);
                 profileData = updatedProfile;
                 updateProfileDisplay();
                 document.getElementById('profileModal').style.display = 'none';
@@ -1011,7 +1011,7 @@ if (forms.expense) {
             split_payments: split
         };
         // ADDED: Use apiCall to save expense to Supabase
-        await apiCall('addOrUpdate', { table: 'expenses', data: ex });
+        await apiCall('expenses', 'insert', ex);
         // Optimistically update UI or wait for real-time update
         expenses.unshift(ex);
         renderExpenses();
@@ -1077,7 +1077,7 @@ forms.transaction.addEventListener('submit', async function (e) {
             status: 'Pending'
         };
         try {
-            await apiCall('addOrUpdate', { table: 'debtors', data: debtor });
+            await apiCall('debtors', 'insert', debtor);
             debtors.unshift(debtor);
             renderDebtors();
             makeStatements();
@@ -1092,7 +1092,7 @@ forms.transaction.addEventListener('submit', async function (e) {
 
     try {
         console.log("Step 3: Sending data to the server...");
-        const savedTx = await apiCall('addOrUpdate', { table: 'transactions', data: txData });
+        const savedTx = await apiCall('transactions', 'insert', txData);
         console.log("Step 4: Server responded successfully! Saved data:", savedTx);
 
         // Update the local data array
@@ -1166,7 +1166,7 @@ buttons.deleteTransaction.addEventListener('click', async function () {
 
     if (confirm('Are you sure you want to delete this transaction? This cannot be undone.')) {
         try {
-            await apiCall('delete', { table: 'transactions', id: txId });
+            await apiCall('transactions', 'delete', { id: txId });
             transactions = transactions.filter(t => t.id !== txId); // Update local array
             renderTransactions();
             makeStatements();
@@ -1914,7 +1914,7 @@ async function settleItem(type, id) {
     };
 
     try {
-        await apiCall('addOrUpdate', { table: (type === 'debtor' ? 'debtors' : 'creditors'), data: settleData });
+        await apiCall((type === 'debtor' ? 'debtors' : 'creditors'), 'update', settleData);
         if (type === 'debtor') {
             debtors = debtors.map(d => d.id === id ? settleData : d);
         } else {
@@ -2360,7 +2360,7 @@ forms.settle.addEventListener('submit', async function (e) {
 
     try {
         // Update creditor/debtor record
-        await apiCall('addOrUpdate', { table: (settleType === 'debtor' ? 'debtors' : 'creditors'), data: updatePayload });
+        await apiCall((settleType === 'debtor' ? 'debtors' : 'creditors'), 'update', updatePayload);
 
         // Statement entry
         const statementEntry = {
@@ -2381,7 +2381,7 @@ forms.settle.addEventListener('submit', async function (e) {
         }
 
         // Save statement in Supabase
-        await apiCall('addOrUpdate', { table: 'statements', data: statementEntry });
+        await apiCall('statements', 'insert', statementEntry);
 
         // Local update (for UI)
         cashStatements.push(statementEntry);

@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { action, payload } = req.body;
+        const { table, action, payload } = req.body;
 
         // Securely initialize Supabase client on the server
         const supabase = createClient(
@@ -39,57 +39,56 @@ export default async function handler(req, res) {
         let data, error;
 
         // Handle different actions from the frontend
-        switch (action) {
-            case 'fetchAll':
-                const [transactions, expenses, debtors, creditors, transfers, banks] = await Promise.all([
-                    supabase.from('transactions').select('*').eq('user_id', userId),
-                    supabase.from('expenses').select('*').eq('user_id', userId),
-                    supabase.from('debtors').select('*').eq('user_id', userId),
-                    supabase.from('creditors').select('*').eq('user_id', userId),
-                    supabase.from('transfers').select('*').eq('user_id', userId),
-                    supabase.from('banks').select('*').eq('user_id', userId),
-                ]);
+        if (action === 'fetchAll') {
+            const [transactions, expenses, debtors, creditors, transfers, banks] = await Promise.all([
+                supabase.from('transactions').select('*').eq('user_id', userId),
+                supabase.from('expenses').select('*').eq('user_id', userId),
+                supabase.from('debtors').select('*').eq('user_id', userId),
+                supabase.from('creditors').select('*').eq('user_id', userId),
+                supabase.from('transfers').select('*').eq('user_id', userId),
+                supabase.from('banks').select('*').eq('user_id', userId),
+            ]);
 
-                const errors = [transactions, expenses, debtors, creditors, transfers, banks]
-                    .map(result => result.error).filter(Boolean);
-                if (errors.length > 0) {
-                    return res.status(500).json({ error: errors.map(e => e.message).join('; ') });
-                }
+            const errors = [transactions, expenses, debtors, creditors, transfers, banks]
+                .map(result => result.error).filter(Boolean);
+            if (errors.length > 0) {
+                return res.status(500).json({ error: errors.map(e => e.message).join('; ') });
+            }
 
-                return res.status(200).json({
-                    transactions: transactions.data,
-                    expenses: expenses.data,
-                    debtors: debtors.data,
-                    creditors: creditors.data,
-                    transfers: transfers.data,
-                    banks: banks.data,
-                });
-
-            case 'addOrUpdate':
-                ({ data, error } = await supabase
-                    .from(payload.table)
-                    .upsert({ ...payload.data, user_id: userId })
-                    .select()
-                    .single());
-                break;
-
-            case 'delete':
-                ({ error } = await supabase
-                    .from(payload.table)
-                    .delete()
-                    .eq('user_id', userId)
-                    .eq('id', payload.id));
-                break;
-            
-            // --- NEW CODE ADDED HERE ---
-            case 'clearAllData':
-                // This calls the SQL function you created in Supabase
-                ({ data, error } = await supabase.rpc('clear_all_user_data'));
-                break;
-            // --- END OF NEW CODE ---
-
-            default:
-                return res.status(400).json({ error: 'Invalid action' });
+            return res.status(200).json({
+                transactions: transactions.data,
+                expenses: expenses.data,
+                debtors: debtors.data,
+                creditors: creditors.data,
+                transfers: transfers.data,
+                banks: banks.data,
+            });
+        } else if (action === 'clearAllData') {
+            // This calls the SQL function you created in Supabase
+            ({ data, error } = await supabase.rpc('clear_all_user_data'));
+        } else if (table) {
+            // Handle table-specific actions
+            switch (action) {
+                case 'insert':
+                case 'update':
+                    ({ data, error } = await supabase
+                        .from(table)
+                        .upsert({ ...payload, user_id: userId })
+                        .select()
+                        .single());
+                    break;
+                case 'delete':
+                    ({ error } = await supabase
+                        .from(table)
+                        .delete()
+                        .eq('user_id', userId)
+                        .eq('id', payload.id));
+                    break;
+                default:
+                    return res.status(400).json({ error: 'Invalid action' });
+            }
+        } else {
+            return res.status(400).json({ error: 'Invalid request: missing table or action' });
         }
 
         if (error) {
