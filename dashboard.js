@@ -386,9 +386,8 @@ forms.creditor.addEventListener("submit", async (e) => {
 forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
-    const settleType = this.dataset.settleType; 
+    const settleType = this.dataset.settleType;
 
-    // This logic will now handle both debtors and creditors
     const isDebtor = settleType === 'debtor';
     const originalItem = isDebtor 
         ? debtors.find(d => d.id == editingId) 
@@ -404,12 +403,12 @@ forms.settle.addEventListener('submit', async function (e) {
     const settleDate = document.getElementById('settleDate').value;
 
     try {
-        // 1. Create a new entry for the settlement with a negative amount
+        // Step 1: Create the new negative entry (this part was already working)
         const settlementEntry = {
             date: settleDate,
             name: originalItem.name,
             phone: originalItem.phone,
-            amount: -settleAmount, // The amount is negative
+            amount: -settleAmount, 
             payment_type: paymentType,
             description: `Settlement for ${originalItem.name}`,
             status: 'Settled'
@@ -424,8 +423,12 @@ forms.settle.addEventListener('submit', async function (e) {
             creditors.push(savedSettlement);
         }
 
-        // 2. Update the status of the original (positive) entry
-        const updatedOriginal = await apiCall(table, 'update', { id: editingId, status: 'Settled' });
+        // Step 2: Update the status of the original entry (THIS IS THE FIX)
+        const updatePayload = {
+            ...originalItem, // Include all the original data
+            status: 'Settled'  // And just change the status
+        };
+        const updatedOriginal = await apiCall(table, 'update', updatePayload);
         
         if (isDebtor) {
             debtors = debtors.map(d => d.id == editingId ? updatedOriginal : d);
@@ -433,16 +436,16 @@ forms.settle.addEventListener('submit', async function (e) {
             creditors = creditors.map(c => c.id == editingId ? updatedOriginal : c);
         }
 
-        // 3. Refresh the UI
+        // Step 3: Refresh the UI
         makeStatements();
         renderDebtors();
         renderCreditors();
         modals.settle.style.display = 'none';
-        alert('Settlement recorded successfully!');
+        alert('Settlement recorded successfully!'); // This alert will now show
 
     } catch (error) {
         console.error("Error processing settlement:", error);
-        alert('Failed to process settlement.');
+        alert('Failed to process settlement.'); // This alert will now stop appearing
     }
 });
 
