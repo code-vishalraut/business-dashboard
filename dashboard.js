@@ -344,7 +344,7 @@ forms.debtor.addEventListener("submit", async (e) => {
   const date = document.getElementById("debtorDate").value;
 
   try {
-    await apiCall("debtors", "insert", { name, amount, date, payment_type: mode, settled: false });
+    await apiCall("debtors", "insert", { name, amount, date, payment_type: mode });
 
     // Debtor Add → minus entry
     await apiCall("statements", "insert", {
@@ -376,7 +376,7 @@ forms.creditor.addEventListener("submit", async (e) => {
   const date = document.getElementById("creditorDate").value;
 
   try {
-    await apiCall("creditors", "insert", { name, amount, date, payment_type: mode, settled: false });
+    await apiCall("creditors", "insert", { name, amount, date, payment_type: mode });
 
     // Creditor Add → plus entry
     await apiCall("statements", "insert", {
