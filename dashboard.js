@@ -364,34 +364,8 @@ forms.debtor.addEventListener("submit", async (e) => {
   }
 });
 
-forms.debtorSettle.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const id = forms.debtorSettle.dataset.id;
-  const amount = parseFloat(document.getElementById("debtor-settle-amount").value);
-  const mode = document.getElementById("debtor-settle-mode").value;
-  const date = document.getElementById("debtor-settle-date").value;
-
-  try {
-    await apiCall("debtors", "update", { id, settled: true });
-
-    // Debtor Settle → plus entry (नई statement बनेगी)
-    await apiCall("statements", "insert", {
-      date,
-      type: "Debtor Settlement",
-      description: "Debtor settled",
-      amount: +amount,
-      mode,
-      source: "debtor" // Add source field to identify this as a debtor transaction
-    });
-
-    closeModal("debtor-settle-modal");
-    loadDebtors();
-    makeStatements();
-    updateBalances();
-  } catch (err) {
-    console.error("Error settling debtor:", err);
-  }
-});
+// Note: The debtorSettle form has been removed as it's not needed
+// Debtor settlements are now handled through the common settle form
 
 
 forms.creditor.addEventListener("submit", async (e) => {
