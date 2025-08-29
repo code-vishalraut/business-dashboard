@@ -2216,61 +2216,65 @@ forms.settle.addEventListener('submit', async function (e) {
     e.preventDefault();
     const editingId = this.dataset.editingId;
     const settleType = this.dataset.settleType;
-    const originalItem = settleType === 'debtor' ? debtors.find(d => d.id === editingId) : creditors.find(c => c.id === editingId);
+
+    const isDebtor = settleType === 'debtor';
+    const originalItem = isDebtor 
+        ? debtors.find(d => d.id == editingId) 
+        : creditors.find(c => c.id == editingId);
 
     if (!originalItem) {
-        alert("Could not find the original item to settle.");
+        alert("Error: Original item not found!");
         return;
     }
 
-    // Mark as Settled
-    const updatePayload = { ...originalItem, status: 'Settled' };
-
-    // Settlement details
     const settleAmount = parseFloat(document.getElementById('settleAmount').value) || 0;
-    const settlePaymentType = document.getElementById('settlePaymentType').value;
+    const paymentType = document.getElementById('settlePaymentType').value;
     const settleDate = document.getElementById('settleDate').value;
-    const settleDesc = document.getElementById('settleDescription').value || `Settlement for ${originalItem.name}`;
 
     try {
-        // Update creditor/debtor record
-        await apiCall((settleType === 'debtor' ? 'debtors' : 'creditors'), 'update', updatePayload);
-
-        // Statement entry
-        const statementEntry = {
+        // 1. Create a NEW entry for the settlement with a negative amount
+        // This new entry includes the correct date, fixing the first error.
+        const settlementEntry = {
             date: settleDate,
-            type: settlePaymentType,
-            amount: 0,
-            payment_type: settlePaymentType,
-            description: settleDesc,
-            source: settleType // Add source field to identify this as a settlement transaction
+            name: originalItem.name,
+            phone: originalItem.phone,
+            amount: -settleAmount, 
+            payment_type: paymentType,
+            description: `Settlement for ${originalItem.name}`,
+            status: 'Settled'
         };
 
-        if (settleType === 'debtor') {
-            // Debtor Settle → plus entry (नई statement बनेगी)
-            statementEntry.amount = +settleAmount;
-            debtors = debtors.map(d => d.id === editingId ? updatePayload : d);
+        const table = isDebtor ? 'debtors' : 'creditors';
+        
+        // This saves to the correct table ('creditors' or 'debtors'),
+        // fixing the 'statements' table error.
+        const savedSettlement = await apiCall(table, 'insert', settlementEntry);
+        
+        if (isDebtor) {
+            debtors.push(savedSettlement);
         } else {
-            // Creditor Settle → minus entry (नई statement बनेगी)
-            statementEntry.amount = -settleAmount;
-            creditors = creditors.map(c => c.id === editingId ? updatePayload : c);
+            creditors.push(savedSettlement);
         }
 
-        // Save statement in Supabase
-        await apiCall('statements', 'insert', statementEntry);
+        // 2. Update the status of the original (positive) loan entry
+        const updatedOriginal = await apiCall(table, 'update', { id: editingId, status: 'Settled' });
+        
+        if (isDebtor) {
+            debtors = debtors.map(d => d.id == editingId ? updatedOriginal : d);
+        } else {
+            creditors = creditors.map(c => c.id == editingId ? updatedOriginal : d);
+        }
 
-        // Local update (for UI)
-        cashStatements.push(statementEntry);
+        // 3. Refresh the UI
         makeStatements();
-
-        // Refresh UI
-        init();
-        if (modals.settle) modals.settle.style.display = 'none';
-        alert(`${settleType} settled successfully.`);
+        renderDebtors();
+        renderCreditors();
+        modals.settle.style.display = 'none';
+        alert('Settlement recorded successfully!');
 
     } catch (error) {
-        console.error("Error settling:", error);
-        alert('Failed to settle. Please try again.');
+        console.error("Error processing settlement:", error);
+        alert('Failed to process settlement.');
     }
 });
 
