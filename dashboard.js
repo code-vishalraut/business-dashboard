@@ -367,16 +367,24 @@ forms.creditor.addEventListener("submit", async (e) => {
   const amount = parseFloat(document.querySelector(".creditorAmount").value);
   const mode = document.querySelector(".creditorPaymentType").value;
   const date = document.getElementById("creditorDate").value;
+  // This is the new line that was missing
+  const description = document.getElementById("creditorDesc").value; 
 
   try {
-    // सिर्फ क्रेडिटर टेबल में सेव करें
-    const newCreditor = await apiCall("creditors", "insert", { name, amount, date, payment_type: mode, status: 'Pending' });
+    // We now include the 'description' when saving
+    const newCreditor = await apiCall("creditors", "insert", { 
+        name, 
+        amount, 
+        date, 
+        payment_type: mode, 
+        description: description, // This was added
+        status: 'Pending' 
+    });
 
-    // लोकल डेटा अपडेट करें और स्टेटमेंट दोबारा बनाएँ
-    creditors.unshift(newCreditor); // लोकल डेटा में जोड़ें
-    makeStatements(); // यह फंक्शन सही स्टेटमेंट बना देगा
-    renderCreditors(); // टेबल को रिफ्रेश करें
-    modals.creditor.style.display = 'none'; // मोडल बंद करें
+    creditors.unshift(newCreditor);
+    makeStatements();
+    renderCreditors();
+    modals.creditor.style.display = 'none';
     
   } catch (err) {
     console.error("Error adding creditor:", err);
