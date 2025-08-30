@@ -483,6 +483,7 @@ if (forms.transfer) {
 function init() {
     updatePaymentTypeOptions();
     setupTabEventListeners();
+    setupChartEventListeners();
     // Your original rendering calls
     renderCategoryFilter();
     renderTransactions();
@@ -523,17 +524,7 @@ function init() {
         });
     }
 
-    // Form submissions with null checks
-    // Transaction form is already handled above in the code
 
-    // Form submissions are already handled above in the code with their own event listeners
-
-    // Settle and profile forms are already handled above in the code
-
-    // Button handlers with null checks
-    // Button handlers are already set up above in the code
-
-    // Tab functionality is handled by setupTabEventListeners()
 }
 
 // Profile management functions
@@ -716,6 +707,26 @@ function updateTrendChart() {
             dataset1Data.push(dayProfit);
         }
     }
+
+    function setupChartEventListeners() {
+    // This handles clicks on the period tabs (7, 15, 30 days)
+    document.querySelectorAll('.period-tab').forEach(tab => {
+        tab.addEventListener('click', function(event) {
+            // First, remove the 'active' class from all tabs
+            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+            // Then, add the 'active' class to the tab that was just clicked
+            event.target.classList.add('active');
+            // Finally, update the chart with the new period
+            updateTrendChart();
+        });
+    });
+
+    // This keeps the listener for the data type dropdown (Income vs Expenses, etc.)
+    const chartDataType = document.getElementById('chartDataType');
+    if (chartDataType) {
+        chartDataType.addEventListener('change', updateTrendChart);
+    }
+}
 
     // Create datasets based on data type
     let datasets;
