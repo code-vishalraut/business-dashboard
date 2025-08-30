@@ -357,9 +357,6 @@ forms.debtor.addEventListener("submit", async (e) => {
   }
 });
 
-// Note: The debtorSettle form has been removed as it's not needed
-// Debtor settlements are now handled through the common settle form
-
 
 forms.creditor.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -997,33 +994,6 @@ function renderCreditors() {
     });
 }
 
-// Expense form submit logic (remove received checkbox logic)
-if (forms.expense) {
-    forms.expense.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const split = Array.from(document.querySelectorAll('#expensePayContainer .split-payment-row')).map(r => ({
-            amount: parseFloat(r.querySelector('.expenseAmount').value) || 0,
-            type: r.querySelector('.expensePaymentType').value
-        })).filter(p => p.amount > 0);
-        const total = split.reduce((s, p) => s + p.amount, 0);
-        const ex = {
-            date: document.getElementById('expenseDate').value,
-            category: document.getElementById('expenseCategory').value,
-            item: document.getElementById('expenseItem').value,
-            amount: total,
-            payment_type: split.map(p => p.type).join(', '),
-            split_payments: split
-        };
-        // ADDED: Use apiCall to save expense to Supabase
-        await apiCall('expenses', 'insert', ex);
-        // Optimistically update UI or wait for real-time update
-        expenses.unshift(ex);
-        renderExpenses();
-        makeStatements();
-        this.reset();
-        modals.expense.style.display = 'none';
-    });
-}
 
 // Transaction form submit logic (keep received logic as is)
 forms.transaction.addEventListener('submit', async function (e) {
@@ -1482,20 +1452,6 @@ async function openSettleModal(type, id) {
     forms.settle.dataset.settleType = type;
     forms.settle.dataset.editingId = id;
     showModal('settle');
-}
-
-
-
-// === AI Assistant Minimize/Maximize ===
-function toggleAIChat() {
-    const aiBox = document.getElementById('aiAssistant');
-    if (!aiBox) return;
-    aiBox.classList.toggle('minimized');
-    // Change icon
-    const icon = document.getElementById('aiToggleIcon');
-    if (icon) {
-        icon.textContent = aiBox.classList.contains('minimized') ? '+' : '−';
-    }
 }
 // =================================================================
 // ADDED: Minimal implementations for missing functions
