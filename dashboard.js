@@ -826,45 +826,31 @@ function updateBankPieChart() {
     const chartCanvas = document.getElementById('bankPieChart');
     if (!chartCanvas) return;
 
-    // Destroy existing chart if it exists
     if (bankPieChart) {
         bankPieChart.destroy();
         bankPieChart = null;
     }
 
     const ctx = chartCanvas.getContext('2d');
-    const bankBalances = {};
+    
+    // Create a new object to hold the final balances.
+    const finalBankBalances = {};
 
-    // Calculate balances from transactions
-    transactions.forEach(tx => {
-        (tx.in_payments || []).forEach(p => {
-            if (p.type !== 'Cash') {
-                bankBalances[p.type] = (bankBalances[p.type] || 0) + Number(p.amount);
-            }
-        });
-        (tx.out_payments || []).forEach(p => {
-            if (p.type !== 'Cash') {
-                bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount);
-            }
-        });
-    });
-
-    // Subtract expenses paid from banks (supports split payments)
-    expenses.forEach(ex => {
-        const splits = Array.isArray(ex.split_payments) ? ex.split_payments : null;
-        if (splits && splits.length) {
-            splits.forEach(p => {
-                if ((p.type || '').toLowerCase() !== 'cash') {
-                    bankBalances[p.type] = (bankBalances[p.type] || 0) - Number(p.amount || 0);
-                }
-            });
-        } else if ((ex.payment_type || '').toLowerCase() !== 'cash') {
-            bankBalances[ex.payment_type] = (bankBalances[ex.payment_type] || 0) - Number(ex.amount || 0);
+    // Loop through the 'bankStatements' object, which is already calculated by makeStatements().
+    for (const bankName in bankStatements) {
+        // Calculate the total balance for each bank from its existing statement entries.
+        const balance = bankStatements[bankName].reduce((total, entry) => {
+            return total + (Number(entry.in) || 0) - (Number(entry.out) || 0);
+        }, 0);
+        
+        // Only add the bank to the chart if its balance is not zero.
+        if (balance !== 0) {
+            finalBankBalances[bankName] = balance;
         }
-    });
+    }
 
-    const labels = Object.keys(bankBalances);
-    const data = Object.values(bankBalances);
+    const labels = Object.keys(finalBankBalances);
+    const data = Object.values(finalBankBalances);
 
     bankPieChart = new Chart(ctx, {
         type: 'pie',
@@ -874,12 +860,12 @@ function updateBankPieChart() {
                 label: 'Bank Balance',
                 data: data,
                 backgroundColor: [
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(255, 159, 64, 0.8)',
                     'rgba(255, 99, 132, 0.8)',
                     'rgba(54, 162, 235, 0.8)',
                     'rgba(255, 206, 86, 0.8)',
-                    'rgba(75, 192, 192, 0.8)',
-                    'rgba(153, 102, 255, 0.8)',
-                    'rgba(255, 159, 64, 0.8)'
+                    'rgba(153, 102, 255, 0.8)'
                 ],
             }]
         },
