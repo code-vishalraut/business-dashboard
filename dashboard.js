@@ -479,6 +479,26 @@ if (forms.transfer) {
     });
 }
 
+function setupChartEventListeners() {
+    // This handles clicks on the period tabs (7, 15, 30 days)
+    document.querySelectorAll('.period-tab').forEach(tab => {
+        tab.addEventListener('click', function(event) {
+            // First, remove the 'active' class from all tabs
+            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+            // Then, add the 'active' class to the tab that was just clicked
+            event.target.classList.add('active');
+            // Finally, update the chart with the new period
+            updateTrendChart();
+        });
+    });
+
+    // This keeps the listener for the data type dropdown (Income vs Expenses, etc.)
+    const chartDataType = document.getElementById('chartDataType');
+    if (chartDataType) {
+        chartDataType.addEventListener('change', updateTrendChart);
+    }
+}
+
 // Your original init function, now called by the new logic
 function init() {
     updatePaymentTypeOptions();
@@ -708,25 +728,7 @@ function updateTrendChart() {
         }
     }
 
-    function setupChartEventListeners() {
-    // This handles clicks on the period tabs (7, 15, 30 days)
-    document.querySelectorAll('.period-tab').forEach(tab => {
-        tab.addEventListener('click', function(event) {
-            // First, remove the 'active' class from all tabs
-            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
-            // Then, add the 'active' class to the tab that was just clicked
-            event.target.classList.add('active');
-            // Finally, update the chart with the new period
-            updateTrendChart();
-        });
-    });
-
-    // This keeps the listener for the data type dropdown (Income vs Expenses, etc.)
-    const chartDataType = document.getElementById('chartDataType');
-    if (chartDataType) {
-        chartDataType.addEventListener('change', updateTrendChart);
-    }
-}
+    
 
     // Create datasets based on data type
     let datasets;
