@@ -5,7 +5,7 @@ let SUPABASE_URL = 'https://clcqdjmfkkvqzxcjbvdm.supabase.co';
 // !!! IMPORTANT: PASTE YOUR 'anon public' KEY FROM YOUR SUPABASE PROJECT HERE !!!
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsY3Fkam1ma2t2cXp4Y2pidmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MTY4MDEsImV4cCI6MjA3MDM5MjgwMX0.C57KA-Ck1YPckr49pH3hfH4fJ5bNzklkINaeseGOFAE';
 
-const sb = window.sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supa_base = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- In-Memory Data Storage (loaded from Supabase) ---
 let transactions = [], expenses = [], debtors = [], creditors = [], transfers = [];
@@ -40,7 +40,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     document.getElementById('auth-error').textContent = '';
-    const { data, error } = await sb.auth.signInWithPassword({
+    const { data, error } = await supa_base.auth.signInWithPassword({
         email: document.getElementById('login-email').value,
         password: document.getElementById('login-password').value
     });
@@ -49,7 +49,7 @@ loginForm.addEventListener('submit', async (e) => {
 
 logoutBtn.addEventListener('click', async () => {
     try {
-        await sb.auth.signOut();
+        await supa_base.auth.signOut();
     } catch (err) {
         console.error('Error during logout:', err);
     } finally {
@@ -59,11 +59,11 @@ logoutBtn.addEventListener('click', async () => {
     }
 });
 
-sb.auth.onAuthStateChange((event, session) => {
+supa_base.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || !session) {
         if (dashboardWrapper) dashboardWrapper.style.display = 'none';
         if (authContainer) authContainer.style.display = 'flex';
-        if (realtimeChannel) sb.removeChannel(realtimeChannel);
+        if (realtimeChannel) supa_base.removeChannel(realtimeChannel);
     } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session.user) initializeDashboard(session.user);
     }
@@ -98,7 +98,7 @@ async function initializeDashboard(user) {
 
 // --- API Helper ---
 async function apiCall(table, action, payload) {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await supa_base.auth.getSession();
     if (!session) throw new Error("No active session.");
     const response = await fetch('/api/proxy', {
         method: 'POST',
