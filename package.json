@@ -10,6 +10,6 @@
     "license": "ISC",
     "dependencies": {
         "@supabase/supabase-js": "^2.56.0",
-        "whatwg-url": "^14.1.0"
+        "whatwg-url": "^14.2.0"
     }
 }
