@@ -5,7 +5,7 @@ let SUPABASE_URL = 'https://clcqdjmfkkvqzxcjbvdm.supabase.co';
 // !!! IMPORTANT: PASTE YOUR 'anon public' KEY FROM YOUR SUPABASE PROJECT HERE !!!
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsY3Fkam1ma2t2cXp4Y2pidmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MTY4MDEsImV4cCI6MjA3MDM5MjgwMX0.C57KA-Ck1YPckr49pH3hfH4fJ5bNzklkINaeseGOFAE';
 
-const supa_base = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supa_base = window.supa_base.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- In-Memory Data Storage (loaded from Supabase) ---
 let transactions = [], expenses = [], debtors = [], creditors = [], transfers = [];
