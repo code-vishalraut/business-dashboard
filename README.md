@@ -2,6 +2,7 @@
 
 A real-time, secure business management dashboard to track transactions, expenses, debtors, and creditors. Deployed live on Vercel with a Supabase backend.
 
+
 **Live Demo:** [https://business-dashboard-lake.vercel.app/](https://business-dashboard-lake.vercel.app/)
 
 ---
@@ -13,6 +14,7 @@ A real-time, secure business management dashboard to track transactions, expense
 ---
 
 ## About The Project
+This project I created for myself beacuse i used many accounting software and i not satisfied with my requirement then i make it for myself only.
 
 This project was built to provide a comprehensive and easy-to-use tool for small business owners to manage their day-to-day finances. It replaces manual record-keeping with a secure, cloud-based solution that can be accessed from any device. The application was originally built with local HTML, CSS, and JavaScript and was later migrated to a full-stack application using Supabase for the database and authentication, and Vercel for deployment.
 
